@@ -10,6 +10,12 @@ const postcode = ref('')
 const itemError = ref('')
 const postcodeError = ref('')
 
+// ================= RECENT SEARCHES =================
+// Load saved searches from localStorage
+const recentSearches = ref(
+  JSON.parse(localStorage.getItem('zwvRecentSearches') || '[]')
+)
+
 const categories = [
   'Batteries',
   'E-Waste',
@@ -18,11 +24,28 @@ const categories = [
   'Plastics',
 ]
 
+// ================= QUICK CATEGORY =================
 const selectCategory = (category) => {
   item.value = category
   itemError.value = ''
 }
 
+// ================= USE RECENT SEARCH =================
+const useRecentSearch = (search) => {
+  item.value = search.item
+  postcode.value = search.postcode
+
+  itemError.value = ''
+  postcodeError.value = ''
+}
+
+// ================= CLEAR RECENT SEARCHES =================
+const clearRecentSearches = () => {
+  recentSearches.value = []
+  localStorage.removeItem('zwvRecentSearches')
+}
+
+// ================= FORM SUBMISSION =================
 const handleSubmit = () => {
   // ================= ITEM VALIDATION =================
   if (!item.value) {
@@ -48,9 +71,34 @@ const handleSubmit = () => {
     }
   }
 
-  // ================= NAVIGATION =================
-  // Navigate only when both fields are valid
+  // ================= SUCCESS =================
   if (!itemError.value && !postcodeError.value) {
+    const currentSearch = {
+      item: item.value,
+      postcode: postcode.value,
+    }
+
+    // Remove duplicate searches
+    recentSearches.value = recentSearches.value.filter((search) => {
+      return !(
+        search.item.toLowerCase() === currentSearch.item.toLowerCase() &&
+        search.postcode === currentSearch.postcode
+      )
+    })
+
+    // Put the newest search first
+    recentSearches.value.unshift(currentSearch)
+
+    // Keep only the latest 5 searches
+    recentSearches.value = recentSearches.value.slice(0, 5)
+
+    // Save to localStorage
+    localStorage.setItem(
+      'zwvRecentSearches',
+      JSON.stringify(recentSearches.value)
+    )
+
+    // Navigate to results
     router.push({
       path: '/results',
       query: {
@@ -191,6 +239,50 @@ const handleSubmit = () => {
                     >
                       Find Recycling Options
                     </button>
+                  </div>
+
+                  <!-- ================= RECENT SEARCHES ================= -->
+                  <div
+                    v-if="recentSearches.length > 0"
+                    class="mt-4 pt-4 border-top"
+                  >
+                    <div
+                      class="d-flex justify-content-between align-items-center gap-3 mb-3"
+                    >
+                      <div>
+                        <p class="fw-semibold mb-0">
+                          Recent Searches
+                        </p>
+
+                        <small class="text-secondary">
+                          Select a previous search to use it again.
+                        </small>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        @click="clearRecentSearches"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                      <button
+                        v-for="search in recentSearches"
+                        :key="`${search.item}-${search.postcode}`"
+                        type="button"
+                        class="btn btn-light border"
+                        @click="useRecentSearch(search)"
+                      >
+                        {{ search.item }}
+
+                        <span class="text-secondary">
+                          · {{ search.postcode }}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </form>
 
