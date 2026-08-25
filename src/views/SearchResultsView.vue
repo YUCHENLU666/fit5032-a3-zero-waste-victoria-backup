@@ -30,9 +30,7 @@ const filteredLocations = computed(() => {
 
   // Step 1: Filter locations by accepted material
   const matches = recyclingLocations.filter((location) => {
-    return location.acceptedMaterials.some(
-      (material) => material.toLowerCase() === item
-    )
+    return location.acceptedMaterials.some((material) => material.toLowerCase() === item)
   })
 
   // Step 2:
@@ -56,19 +54,16 @@ const filteredLocations = computed(() => {
     <!-- ================= HEADER ================= -->
     <section class="bg-light py-5">
       <div class="container py-lg-4">
-        <p class="text-success fw-bold text-uppercase mb-2">
-          Recycling Finder
-        </p>
+        <p class="text-success fw-bold text-uppercase mb-2">Recycling Finder</p>
 
-        <h1 class="display-5 fw-bold mb-3">
-          Search Results
-        </h1>
+        <h1 class="display-5 fw-bold mb-3">Search Results</h1>
 
         <p class="lead text-secondary mb-0">
           Showing recycling options for
           <strong>{{ searchItem }}</strong>
           near postcode
-          <strong>{{ searchPostcode }}</strong>.
+          <strong>{{ searchPostcode }}</strong
+          >.
         </p>
       </div>
     </section>
@@ -76,16 +71,12 @@ const filteredLocations = computed(() => {
     <!-- ================= RESULTS ================= -->
     <section class="py-5">
       <div class="container">
-
         <!-- Results summary -->
         <div
-          class="d-flex flex-column flex-md-row justify-content-between
-                 align-items-md-center gap-3 mb-4"
+          class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4"
         >
           <div>
-            <h2 class="h4 fw-bold mb-1">
-              Available locations
-            </h2>
+            <h2 class="h4 fw-bold mb-1">Available locations</h2>
 
             <p class="text-secondary mb-0">
               {{ filteredLocations.length }}
@@ -93,54 +84,28 @@ const filteredLocations = computed(() => {
             </p>
           </div>
 
-          <RouterLink
-            to="/recycle"
-            class="btn btn-outline-success"
-          >
-            ← Change Search
-          </RouterLink>
+          <RouterLink to="/recycle" class="btn btn-outline-success"> ← Change Search </RouterLink>
         </div>
 
         <!-- ================= RESULTS EXIST ================= -->
-        <div
-          v-if="filteredLocations.length > 0"
-          class="row g-4"
-        >
-          <div
-            v-for="location in filteredLocations"
-            :key="location.id"
-            class="col-lg-6"
-          >
+        <div v-if="filteredLocations.length > 0" class="row g-4">
+          <div v-for="location in filteredLocations" :key="location.id" class="col-lg-6">
             <RecyclingCard :location="location" />
           </div>
         </div>
 
         <!-- ================= NO RESULTS ================= -->
-        <div
-          v-else
-          class="text-center bg-light rounded-4 p-5"
-        >
-          <div class="display-4 mb-3">
-            ♻
-          </div>
+        <div v-else class="text-center bg-light rounded-4 p-5">
+          <div class="display-4 mb-3">♻</div>
 
-          <h2 class="h4 fw-bold">
-            No matching locations found
-          </h2>
+          <h2 class="h4 fw-bold">No matching locations found</h2>
 
           <p class="text-secondary mb-4">
-            Try another material or postcode to explore
-            more recycling options.
+            Try another material or postcode to explore more recycling options.
           </p>
 
-          <RouterLink
-            to="/recycle"
-            class="btn btn-success"
-          >
-            Search Again
-          </RouterLink>
+          <RouterLink to="/recycle" class="btn btn-success"> Search Again </RouterLink>
         </div>
-
       </div>
     </section>
   </div>

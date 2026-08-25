@@ -12,17 +12,9 @@ const postcodeError = ref('')
 
 // ================= RECENT SEARCHES =================
 // Load saved searches from localStorage
-const recentSearches = ref(
-  JSON.parse(localStorage.getItem('zwvRecentSearches') || '[]')
-)
+const recentSearches = ref(JSON.parse(localStorage.getItem('zwvRecentSearches') || '[]'))
 
-const categories = [
-  'Batteries',
-  'E-Waste',
-  'Clothing',
-  'Furniture',
-  'Plastics',
-]
+const categories = ['Batteries', 'E-Waste', 'Clothing', 'Furniture', 'Plastics']
 
 // ================= QUICK CATEGORY =================
 const selectCategory = (category) => {
@@ -93,10 +85,7 @@ const handleSubmit = () => {
     recentSearches.value = recentSearches.value.slice(0, 5)
 
     // Save to localStorage
-    localStorage.setItem(
-      'zwvRecentSearches',
-      JSON.stringify(recentSearches.value)
-    )
+    localStorage.setItem('zwvRecentSearches', JSON.stringify(recentSearches.value))
 
     // Navigate to results
     router.push({
@@ -115,17 +104,13 @@ const handleSubmit = () => {
     <!-- ================= PAGE HEADER ================= -->
     <section class="bg-light py-5">
       <div class="container text-center py-lg-4">
-        <p class="text-success fw-bold text-uppercase mb-2">
-          Recycling Finder
-        </p>
+        <p class="text-success fw-bold text-uppercase mb-2">Recycling Finder</p>
 
-        <h1 class="display-5 fw-bold mb-3">
-          Find the right place for your item
-        </h1>
+        <h1 class="display-5 fw-bold mb-3">Find the right place for your item</h1>
 
         <p class="lead text-secondary mx-auto finder-intro">
-          Tell us what you want to recycle and your postcode,
-          and we’ll help you find suitable recycling and reuse options.
+          Tell us what you want to recycle and your postcode, and we’ll help you find suitable
+          recycling and reuse options.
         </p>
       </div>
     </section>
@@ -135,20 +120,12 @@ const handleSubmit = () => {
       <div class="container">
         <div class="row justify-content-center">
           <div class="col-lg-8">
-
             <div class="card border-0 shadow-sm rounded-4">
               <div class="card-body p-4 p-md-5">
-
-                <form
-                  @submit.prevent="handleSubmit"
-                  novalidate
-                >
+                <form @submit.prevent="handleSubmit" novalidate>
                   <!-- ================= MATERIAL ================= -->
                   <div class="mb-4">
-                    <label
-                      for="item"
-                      class="form-label fw-semibold"
-                    >
+                    <label for="item" class="form-label fw-semibold">
                       What would you like to recycle?
                       <span class="text-danger">*</span>
                     </label>
@@ -162,23 +139,16 @@ const handleSubmit = () => {
                       placeholder="e.g. Batteries"
                     />
 
-                    <div
-                      v-if="itemError"
-                      class="invalid-feedback"
-                    >
+                    <div v-if="itemError" class="invalid-feedback">
                       {{ itemError }}
                     </div>
 
-                    <div class="form-text">
-                      Enter an item or choose a category below.
-                    </div>
+                    <div class="form-text">Enter an item or choose a category below.</div>
                   </div>
 
                   <!-- ================= QUICK CATEGORIES ================= -->
                   <div class="mb-4">
-                    <p class="fw-semibold mb-2">
-                      Quick Categories
-                    </p>
+                    <p class="fw-semibold mb-2">Quick Categories</p>
 
                     <div class="d-flex flex-wrap gap-2">
                       <button
@@ -186,11 +156,7 @@ const handleSubmit = () => {
                         :key="category"
                         type="button"
                         class="btn"
-                        :class="
-                          item === category
-                            ? 'btn-success'
-                            : 'btn-outline-success'
-                        "
+                        :class="item === category ? 'btn-success' : 'btn-outline-success'"
                         @click="selectCategory(category)"
                       >
                         {{ category }}
@@ -200,10 +166,7 @@ const handleSubmit = () => {
 
                   <!-- ================= POSTCODE ================= -->
                   <div class="mb-4">
-                    <label
-                      for="postcode"
-                      class="form-label fw-semibold"
-                    >
+                    <label for="postcode" class="form-label fw-semibold">
                       Postcode
                       <span class="text-danger">*</span>
                     </label>
@@ -219,40 +182,25 @@ const handleSubmit = () => {
                       placeholder="e.g. 3168"
                     />
 
-                    <div
-                      v-if="postcodeError"
-                      class="invalid-feedback"
-                    >
+                    <div v-if="postcodeError" class="invalid-feedback">
                       {{ postcodeError }}
                     </div>
 
-                    <div class="form-text">
-                      Enter a 4-digit Victorian postcode.
-                    </div>
+                    <div class="form-text">Enter a 4-digit Victorian postcode.</div>
                   </div>
 
                   <!-- ================= SUBMIT ================= -->
                   <div class="d-grid d-sm-flex justify-content-sm-end">
-                    <button
-                      type="submit"
-                      class="btn btn-success btn-lg px-4"
-                    >
+                    <button type="submit" class="btn btn-success btn-lg px-4">
                       Find Recycling Options
                     </button>
                   </div>
 
                   <!-- ================= RECENT SEARCHES ================= -->
-                  <div
-                    v-if="recentSearches.length > 0"
-                    class="mt-4 pt-4 border-top"
-                  >
-                    <div
-                      class="d-flex justify-content-between align-items-center gap-3 mb-3"
-                    >
+                  <div v-if="recentSearches.length > 0" class="mt-4 pt-4 border-top">
+                    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
                       <div>
-                        <p class="fw-semibold mb-0">
-                          Recent Searches
-                        </p>
+                        <p class="fw-semibold mb-0">Recent Searches</p>
 
                         <small class="text-secondary">
                           Select a previous search to use it again.
@@ -278,48 +226,38 @@ const handleSubmit = () => {
                       >
                         {{ search.item }}
 
-                        <span class="text-secondary">
-                          · {{ search.postcode }}
-                        </span>
+                        <span class="text-secondary"> · {{ search.postcode }} </span>
                       </button>
                     </div>
                   </div>
                 </form>
-
               </div>
             </div>
 
             <!-- ================= INFORMATION ================= -->
             <div class="row g-4 mt-4">
-
               <div class="col-md-6">
                 <div class="p-4 bg-light rounded-4 h-100">
-                  <h2 class="h5 fw-bold">
-                    ♻ Why recycle correctly?
-                  </h2>
+                  <h2 class="h5 fw-bold">♻ Why recycle correctly?</h2>
 
                   <p class="text-secondary mb-0">
-                    Correct disposal helps recover useful materials
-                    and reduces unnecessary waste going to landfill.
+                    Correct disposal helps recover useful materials and reduces unnecessary waste
+                    going to landfill.
                   </p>
                 </div>
               </div>
 
               <div class="col-md-6">
                 <div class="p-4 bg-light rounded-4 h-100">
-                  <h2 class="h5 fw-bold">
-                    📍 Local options
-                  </h2>
+                  <h2 class="h5 fw-bold">📍 Local options</h2>
 
                   <p class="text-secondary mb-0">
-                    Search results will show suitable services based
-                    on the material and postcode you provide.
+                    Search results will show suitable services based on the material and postcode
+                    you provide.
                   </p>
                 </div>
               </div>
-
             </div>
-
           </div>
         </div>
       </div>

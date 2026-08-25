@@ -8,8 +8,7 @@ export const recyclingLocations = [
     rating: 4.6,
     status: 'Open',
     acceptedMaterials: ['Batteries', 'E-Waste'],
-    description:
-      'A local drop-off point for selected recyclable household materials.',
+    description: 'A local drop-off point for selected recyclable household materials.',
   },
 
   {
@@ -21,8 +20,7 @@ export const recyclingLocations = [
     rating: 4.7,
     status: 'Open',
     acceptedMaterials: ['Batteries', 'E-Waste', 'Plastics'],
-    description:
-      'A community recycling location accepting a range of recyclable materials.',
+    description: 'A community recycling location accepting a range of recyclable materials.',
   },
 
   {
@@ -34,8 +32,7 @@ export const recyclingLocations = [
     rating: 4.3,
     status: 'Open',
     acceptedMaterials: ['Batteries', 'Clothing'],
-    description:
-      'A local collection point supporting battery recycling and clothing reuse.',
+    description: 'A local collection point supporting battery recycling and clothing reuse.',
   },
 
   {
@@ -47,8 +44,7 @@ export const recyclingLocations = [
     rating: 4.5,
     status: 'Open',
     acceptedMaterials: ['Furniture'],
-    description:
-      'A community reuse centre helping extend the life of unwanted furniture.',
+    description: 'A community reuse centre helping extend the life of unwanted furniture.',
   },
 
   {
@@ -73,7 +69,6 @@ export const recyclingLocations = [
     rating: 4.2,
     status: 'Closed',
     acceptedMaterials: ['Plastics'],
-    description:
-      'A local collection point for selected recyclable plastic materials.',
+    description: 'A local collection point for selected recyclable plastic materials.',
   },
 ]

@@ -10,7 +10,6 @@ defineProps({
 <template>
   <div class="card h-100 border-0 shadow-sm rounded-4 result-card">
     <div class="card-body p-4">
-
       <!-- Location name and status -->
       <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
         <div>
@@ -18,18 +17,12 @@ defineProps({
             {{ location.name }}
           </h2>
 
-          <p class="text-secondary mb-0">
-            📍 {{ location.suburb }} VIC {{ location.postcode }}
-          </p>
+          <p class="text-secondary mb-0">📍 {{ location.suburb }} VIC {{ location.postcode }}</p>
         </div>
 
         <span
           class="badge rounded-pill"
-          :class="
-            location.status === 'Open'
-              ? 'text-bg-success'
-              : 'text-bg-secondary'
-          "
+          :class="location.status === 'Open' ? 'text-bg-success' : 'text-bg-secondary'"
         >
           {{ location.status }}
         </span>
@@ -40,31 +33,21 @@ defineProps({
       <!-- Distance and rating -->
       <div class="d-flex flex-wrap gap-4 mb-3">
         <div>
-          <span class="text-secondary small d-block">
-            Distance
-          </span>
+          <span class="text-secondary small d-block"> Distance </span>
 
-          <span class="fw-semibold">
-            {{ location.distance }} km
-          </span>
+          <span class="fw-semibold"> {{ location.distance }} km </span>
         </div>
 
         <div>
-          <span class="text-secondary small d-block">
-            Community Rating
-          </span>
+          <span class="text-secondary small d-block"> Community Rating </span>
 
-          <span class="fw-semibold">
-            ⭐ {{ location.rating }}
-          </span>
+          <span class="fw-semibold"> ⭐ {{ location.rating }} </span>
         </div>
       </div>
 
       <!-- Accepted materials -->
       <div class="mb-3">
-        <p class="fw-semibold mb-2">
-          Accepted Materials
-        </p>
+        <p class="fw-semibold mb-2">Accepted Materials</p>
 
         <div class="d-flex flex-wrap gap-2">
           <span
@@ -81,7 +64,6 @@ defineProps({
       <p class="text-secondary mb-0">
         {{ location.description }}
       </p>
-
     </div>
   </div>
 </template>

@@ -5,11 +5,8 @@ import { RouterLink } from 'vue-router'
 <template>
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
     <div class="container">
-
       <!-- Brand -->
-      <RouterLink class="navbar-brand fw-bold" to="/">
-        ♻ ZWV Circular Hub
-      </RouterLink>
+      <RouterLink class="navbar-brand fw-bold" to="/"> ♻ ZWV Circular Hub </RouterLink>
 
       <!-- Mobile toggle -->
       <button
@@ -27,18 +24,13 @@ import { RouterLink } from 'vue-router'
       <!-- Navigation links -->
       <div id="mainNavbar" class="collapse navbar-collapse">
         <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/"> Home </RouterLink>
+          </li>
 
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/">
-                Home
-            </RouterLink>
-            </li>
-
-            <li class="nav-item">
-            <RouterLink class="nav-link" to="/recycle">
-                Recycle & Reuse
-            </RouterLink>
-            </li>
+            <RouterLink class="nav-link" to="/recycle"> Recycle & Reuse </RouterLink>
+          </li>
 
           <li class="nav-item">
             <span class="nav-link">
@@ -57,10 +49,8 @@ import { RouterLink } from 'vue-router'
               <!-- TODO: About & Impact -->
             </span>
           </li>
-
         </ul>
       </div>
-
     </div>
   </nav>
 </template>
