@@ -24,6 +24,14 @@ const router = createRouter({
       component: SearchResultsView,
     },
   ],
+
+  // Return to the top of the page whenever the route changes
+  scrollBehavior() {
+    return {
+      top: 0,
+      left: 0,
+    }
+  },
 })
 
 export default router
