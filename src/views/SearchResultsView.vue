@@ -60,10 +60,10 @@ const filteredLocations = computed(() => {
 
         <p class="lead text-secondary mb-0">
           Showing recycling options for
-          <strong>{{ searchItem }}</strong>
-          near postcode
-          <strong>{{ searchPostcode }}</strong
-          >.
+          <strong>{{ searchItem }}</strong
+          >, with postcode
+          <strong>{{ searchPostcode }}</strong>
+          prioritised.
         </p>
       </div>
     </section>

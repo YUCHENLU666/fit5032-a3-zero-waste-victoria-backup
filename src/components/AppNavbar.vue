@@ -33,21 +33,15 @@ import { RouterLink } from 'vue-router'
           </li>
 
           <li class="nav-item">
-            <span class="nav-link">
-              <!-- TODO: Learn -->
-            </span>
+            <span class="nav-link"> </span>
           </li>
 
           <li class="nav-item">
-            <span class="nav-link">
-              <!-- TODO: Community -->
-            </span>
+            <span class="nav-link"> </span>
           </li>
 
           <li class="nav-item">
-            <span class="nav-link">
-              <!-- TODO: About & Impact -->
-            </span>
+            <span class="nav-link"> </span>
           </li>
         </ul>
       </div>

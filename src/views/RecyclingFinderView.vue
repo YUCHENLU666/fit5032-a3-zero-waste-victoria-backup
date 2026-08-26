@@ -55,9 +55,9 @@ const handleSubmit = () => {
   } else {
     const postcodeNumber = Number(postcode.value)
 
-    // Step 2: Check Victorian project scope
+    // Step 2: Check current project service area
     if (postcodeNumber < 3000 || postcodeNumber > 3999) {
-      postcodeError.value = 'Please enter a Victorian postcode.'
+      postcodeError.value = 'Please enter a postcode in the current service area (3000–3999).'
     } else {
       postcodeError.value = ''
     }
@@ -186,7 +186,9 @@ const handleSubmit = () => {
                       {{ postcodeError }}
                     </div>
 
-                    <div class="form-text">Enter a 4-digit Victorian postcode.</div>
+                    <div class="form-text">
+                      Enter a postcode in the current Victorian service area (3000–3999).
+                    </div>
                   </div>
 
                   <!-- ================= SUBMIT ================= -->

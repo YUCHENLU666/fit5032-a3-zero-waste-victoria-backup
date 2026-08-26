@@ -135,31 +135,31 @@ import { RouterLink } from 'vue-router'
       </div>
     </section>
 
-    <!-- ================= POPULAR MATERIALS ================= -->
+    <!-- ================= COMMON MATERIALS ================= -->
     <section class="py-5 bg-light">
       <div class="container">
         <div class="row align-items-center g-4">
           <div class="col-lg-5">
-            <p class="text-success fw-bold text-uppercase mb-2">Quick Search</p>
+            <p class="text-success fw-bold text-uppercase mb-2">Common Materials</p>
 
-            <h2 class="fw-bold">Popular materials</h2>
+            <h2 class="fw-bold">Popular recycling categories</h2>
 
             <p class="text-secondary mb-0">
-              Not sure where something belongs? Start with one of these common categories.
+              These are some common materials supported by the Recycling Finder.
             </p>
           </div>
 
           <div class="col-lg-7">
             <div class="d-flex flex-wrap gap-3">
-              <button type="button" class="btn btn-outline-success px-4">Batteries</button>
+              <span class="material-pill"> Batteries </span>
 
-              <button type="button" class="btn btn-outline-success px-4">E-Waste</button>
+              <span class="material-pill"> E-Waste </span>
 
-              <button type="button" class="btn btn-outline-success px-4">Clothing</button>
+              <span class="material-pill"> Clothing </span>
 
-              <button type="button" class="btn btn-outline-success px-4">Furniture</button>
+              <span class="material-pill"> Furniture </span>
 
-              <button type="button" class="btn btn-outline-success px-4">Plastics</button>
+              <span class="material-pill"> Plastics </span>
             </div>
           </div>
         </div>
@@ -207,6 +207,16 @@ import { RouterLink } from 'vue-router'
 
 .btn:hover {
   transform: translateY(-1px);
+}
+
+.material-pill {
+  display: inline-block;
+  padding: 0.6rem 1.25rem;
+  border: 1px solid var(--bs-success);
+  border-radius: 999px;
+  color: var(--bs-success);
+  background-color: white;
+  font-weight: 500;
 }
 
 section {
