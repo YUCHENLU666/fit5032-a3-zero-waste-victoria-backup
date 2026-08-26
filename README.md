@@ -1,44 +1,81 @@
-# .
+# Zero Waste Victoria Circular Hub
 
-This template should help get you started developing with Vue 3 in Vite.
+FIT5032 A1.2 – Basic Application Development Version 1
 
-## Recommended IDE Setup
+## Overview
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Zero Waste Victoria Circular Hub is a responsive web application designed to help users find suitable recycling and reuse options across Melbourne.
 
-## Recommended Browser Setup
+The application supports waste reduction and circular economy behaviours by allowing users to search for recycling options by material and postcode, view dynamically generated recycling locations, and reuse previous searches stored in the browser.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## Implemented Features
 
-## Customize configuration
+- Responsive Vue 3 user interface
+- Recycling Finder with material and postcode input
+- Client-side form validation
+- Quick material category selection
+- Dynamic recycling search results
+- Postcode-prioritised search results
+- Reusable recycling location cards
+- Recent Searches stored using Local Storage
+- Responsive navigation and mobile layout
+- Vue Router navigation between pages
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Business Requirements
 
-## Project Setup
+### BR A.1 – Development Stack and Coding
 
-```sh
-npm install
-```
+The application is developed using Vue 3 with the Composition API and is structured using reusable components, views, routing and JavaScript data modules.
 
-### Compile and Hot-Reload for Development
+### BR A.2 – Responsiveness
 
-```sh
-npm run dev
-```
+Bootstrap 5 responsive utilities and grid layouts are used to support desktop, tablet and mobile screen sizes.
 
-### Compile and Minify for Production
+### BR B.1 – Validations
 
-```sh
-npm run build
-```
+The Recycling Finder includes multiple client-side validations:
 
-### Lint with [ESLint](https://eslint.org/)
+- A recycling item or category is required
+- Postcodes must contain exactly four digits
+- Postcodes must be within the current service area (3000–3999)
 
-```sh
-npm run lint
-```
+Validation feedback is displayed directly below the relevant input field.
+
+### BR B.2 – Dynamic Data and Data Structures
+
+Recycling locations are stored in JavaScript data structures and dynamically filtered according to the user's selected material.
+
+Matching postcodes are prioritised in the results, and location information is displayed using reusable Vue components.
+
+Recent searches are also stored in Local Storage so they remain available after the page is refreshed.
+
+## Technology Stack
+
+- Vue 3
+- Composition API
+- Vue Router
+- Bootstrap 5
+- JavaScript
+- HTML
+- CSS
+- Local Storage
+- Vite
+
+## Project Structure
+
+```text
+src/
+├── components/
+│   ├── AppFooter.vue
+│   ├── AppNavbar.vue
+│   └── RecyclingCard.vue
+├── data/
+│   └── recyclingLocations.js
+├── router/
+│   └── index.js
+├── views/
+│   ├── HomeView.vue
+│   ├── RecyclingFinderView.vue
+│   └── SearchResultsView.vue
+├── App.vue
+└── main.js
