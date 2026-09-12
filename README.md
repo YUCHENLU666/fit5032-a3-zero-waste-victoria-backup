@@ -1,12 +1,14 @@
 # Zero Waste Victoria Circular Hub
 
-FIT5032 A1.2 – Basic Application Development Version 1
+FIT5032 A1.3 – Business Requirements Implementation
 
 ## Overview
 
-Zero Waste Victoria Circular Hub is a responsive web application designed to help users find suitable recycling and reuse options across Melbourne.
+Zero Waste Victoria Circular Hub is a responsive Vue 3 web application designed to help users find suitable recycling and reuse options across Melbourne.
 
-The application supports waste reduction and circular economy behaviours by allowing users to search for recycling options by material and postcode, view dynamically generated recycling locations, and reuse previous searches stored in the browser.
+The application supports waste reduction and circular economy behaviours by allowing users to search for recycling locations by material and postcode, create user accounts, securely log in, rate recycling locations, and access role-specific functionality.
+
+The current version extends the previous application with authentication, role-based access control, community ratings and additional security measures.
 
 ## Implemented Features
 
@@ -18,64 +20,120 @@ The application supports waste reduction and circular economy behaviours by allo
 - Postcode-prioritised search results
 - Reusable recycling location cards
 - Recent Searches stored using Local Storage
+- User registration and login
+- Multiple user accounts
+- User and administrator roles
+- Protected account and administrator routes
+- User logout
+- User account information page
+- Administrator dashboard
+- Community 1–5 star rating system
+- Aggregated rating averages and rating counts
+- Existing ratings can be updated without duplicate entries
+- Password hashing using PBKDF2 and per-user random salts
+- Input validation for user-generated content
+- Protection against common XSS-style input
+- Role verification to reduce client-side session role tampering
 - Responsive navigation and mobile layout
 - Vue Router navigation between pages
 
 ## Business Requirements
 
-### BR A.1 – Development Stack and Coding
+### BR C.1 – Authentication
 
-The application is developed using Vue 3 with the Composition API and is structured using reusable components, views, routing and JavaScript data modules.
+The application implements a client-side authentication system that supports multiple registered users.
 
-### BR A.2 – Responsiveness
+Users can:
 
-Bootstrap 5 responsive utilities and grid layouts are used to support desktop, tablet and mobile screen sizes.
+- Create a new account
+- Log in using their email and password
+- Remain authenticated while navigating the application
+- Access their account page
+- Log out securely
 
-### BR B.1 – Validations
+Registered account information is stored in Local Storage for this client-side assignment implementation.
 
-The Recycling Finder includes multiple client-side validations:
+Passwords are not stored in plaintext.
 
-- A recycling item or category is required
-- Postcodes must contain exactly four digits
-- Postcodes must be within the current service area (3000–3999)
+### BR C.2 – Role-Based Authentication
 
-Validation feedback is displayed directly below the relevant input field.
+The application supports two roles:
 
-### BR B.2 – Dynamic Data and Data Structures
+- `user`
+- `admin`
 
-Recycling locations are stored in JavaScript data structures and dynamically filtered according to the user's selected material.
+Normal users can access their own account page but cannot access the administrator dashboard.
 
-Matching postcodes are prioritised in the results, and location information is displayed using reusable Vue components.
+Administrators can access the protected `/admin` route and view registered account information.
 
-Recent searches are also stored in Local Storage so they remain available after the page is refreshed.
+Vue Router navigation guards are used to protect authenticated and administrator-only routes.
 
-## Technology Stack
+The application also verifies the current user's role against the registered user data rather than trusting only the role stored in the current session.
 
-- Vue 3
-- Composition API
-- Vue Router
-- Bootstrap 5
-- JavaScript
-- HTML
-- CSS
-- Local Storage
-- Vite
+### BR C.3 – Community Rating
 
-## Project Structure
+Authenticated users can rate recycling locations using a 1–5 star rating system.
+
+The rating system:
+
+- Stores ratings in Local Storage
+- Associates ratings with both a user and recycling location
+- Allows one rating per user for each location
+- Allows users to update an existing rating
+- Calculates the aggregated community rating
+- Displays the average rating
+- Displays the total number of ratings
+- Allows guests to view ratings while requiring login to submit a rating
+
+For example, if two users give a location ratings of 4 and 5, the displayed community rating is 4.5 / 5 with two ratings.
+
+### BR C.4 – Security
+
+Several client-side security measures have been implemented.
+
+#### Password Protection
+
+Passwords are processed using the browser Web Crypto API with:
+
+- PBKDF2
+- SHA-256
+- 100,000 iterations
+- A unique random salt for each account
+
+Only `passwordHash` and `passwordSalt` are stored. Plaintext passwords are not stored in Local Storage.
+
+#### Input Validation
+
+Usernames are validated using a restricted character set.
+
+Recycling search inputs are also validated to restrict unexpected or potentially unsafe characters before they are added to search history or URL query parameters.
+
+Postcodes must:
+
+- Contain exactly four digits
+- Be within the current supported range of 3000–3999
+
+#### XSS Protection
+
+User-controlled content is rendered using Vue interpolation rather than raw HTML.
+
+This means HTML-like input is displayed as text rather than executed as markup or JavaScript.
+
+#### Role Protection
+
+The current session is used primarily to identify the logged-in user.
+
+The user's actual role is re-checked against the registered user record before protected functionality is authorised.
+
+This reduces the ability for a normal user to gain administrator access by changing only the role stored in the current session.
+
+> Note: This assignment uses a client-side Local Storage authentication model. In a production system, authentication, password storage and role authorisation should be managed by a trusted backend service.
+
+## Demo Accounts
+
+### Administrator
+
+Email:
 
 ```text
-src/
-├── components/
-│   ├── AppFooter.vue
-│   ├── AppNavbar.vue
-│   └── RecyclingCard.vue
-├── data/
-│   └── recyclingLocations.js
-├── router/
-│   └── index.js
-├── views/
-│   ├── HomeView.vue
-│   ├── RecyclingFinderView.vue
-│   └── SearchResultsView.vue
-├── App.vue
-└── main.js
+admin@zwv.com
