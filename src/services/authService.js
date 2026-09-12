@@ -1,58 +1,211 @@
 const USERS_KEY = 'zwvUsers'
 const CURRENT_USER_KEY = 'zwvCurrentUser'
 
+
+// ======================================================
+// Generate random salt
+// ======================================================
+
+// Create a random 16-byte salt
+// and convert it into a hexadecimal string.
+function generateSalt() {
+  const bytes = new Uint8Array(16)
+
+  crypto.getRandomValues(bytes)
+
+  return Array.from(bytes)
+    .map((byte) =>
+      byte.toString(16).padStart(2, '0')
+    )
+    .join('')
+}
+
+
+// ======================================================
+// Hash password using Web Crypto PBKDF2
+// ======================================================
+
+async function hashPassword(password, salt) {
+  const encoder = new TextEncoder()
+
+  // Convert password into bytes
+  const passwordData = encoder.encode(password)
+
+  // Import the password as key material
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    passwordData,
+    {
+      name: 'PBKDF2',
+    },
+    false,
+    ['deriveBits']
+  )
+
+  // Convert the hexadecimal salt back into bytes
+  const saltBytes = new Uint8Array(
+    salt.match(/.{1,2}/g).map(
+      (byte) => parseInt(byte, 16)
+    )
+  )
+
+  // Derive a password hash
+  const derivedBits =
+    await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: saltBytes,
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      256
+    )
+
+  const hashBytes =
+    new Uint8Array(derivedBits)
+
+  // Convert hash bytes into hexadecimal
+  const hashParts =
+    Array.from(hashBytes).map(
+      (byte) =>
+        byte.toString(16).padStart(2, '0')
+    )
+
+  return hashParts.join('')
+}
+
+
+// ======================================================
 // Read all users from localStorage
+// ======================================================
+
 export function getUsers() {
   try {
-    const storedUsers = localStorage.getItem(USERS_KEY)
+    const storedUsers =
+      localStorage.getItem(USERS_KEY)
 
     if (!storedUsers) {
       return []
     }
 
-    // TODO 1:
-    // Parse storedUsers from JSON and return the result
     return JSON.parse(storedUsers)
   } catch (error) {
-    console.error('Failed to load users:', error)
+    console.error(
+      'Failed to load users:',
+      error
+    )
+
     return []
   }
 }
 
+
+// ======================================================
 // Save all users to localStorage
+// ======================================================
+
 function saveUsers(users) {
-  // TODO 2:
-  // Convert users into JSON and save using USERS_KEY
-  localStorage.setItem(USERS_KEY, JSON.stringify(users))
+  localStorage.setItem(
+    USERS_KEY,
+    JSON.stringify(users)
+  )
 }
 
+
+// ======================================================
 // Get current logged-in user
+// ======================================================
+
 export function getCurrentUser() {
   try {
-    const storedUser = localStorage.getItem(CURRENT_USER_KEY)
+    const storedUser =
+      localStorage.getItem(CURRENT_USER_KEY)
 
     if (!storedUser) {
       return null
     }
 
-    // TODO 3:
-    // Parse storedUser and return it
-    return JSON.parse(storedUser)
+    // Treat zwvCurrentUser only as
+    // session identity information.
+    const sessionUser =
+      JSON.parse(storedUser)
+
+    // A valid session must contain a user id.
+    if (!sessionUser?.id) {
+      localStorage.removeItem(
+        CURRENT_USER_KEY
+      )
+
+      return null
+    }
+
+    // Read the full account list.
+    const users = getUsers()
+
+    // Find the real account using
+    // the id stored in the session.
+    const realUser = users.find(
+      (user) =>
+        user.id === sessionUser.id
+    )
+
+    // If the account no longer exists,
+    // the session is invalid.
+    if (!realUser) {
+      localStorage.removeItem(
+        CURRENT_USER_KEY
+      )
+
+      return null
+    }
+
+    // Return safe account information
+    // from zwvUsers.
+    //
+    // Do not trust role, username or email
+    // stored inside zwvCurrentUser.
+    return {
+      id: realUser.id,
+      username: realUser.username,
+      email: realUser.email,
+      role: realUser.role,
+    }
   } catch (error) {
-    console.error('Failed to load current user:', error)
+    console.error(
+      'Failed to load current user:',
+      error
+    )
+
+    // Remove invalid/corrupted session data.
+    localStorage.removeItem(
+      CURRENT_USER_KEY
+    )
+
     return null
   }
 }
 
+
+// ======================================================
 // Register new account
-export async function registerUser(username, email, password) {
+// ======================================================
+
+export async function registerUser(
+  username,
+  email,
+  password
+) {
   const users = getUsers()
 
   const cleanUsername = username.trim()
-  const cleanEmail = email.trim().toLowerCase()
+  const cleanEmail =
+    email.trim().toLowerCase()
 
   const usernameExists = users.some(
-    (user) => user.username.toLowerCase() === cleanUsername.toLowerCase()
+    (user) =>
+      user.username.toLowerCase() ===
+      cleanUsername.toLowerCase()
   )
 
   if (usernameExists) {
@@ -63,7 +216,9 @@ export async function registerUser(username, email, password) {
   }
 
   const emailExists = users.some(
-    (user) => user.email.toLowerCase() === cleanEmail
+    (user) =>
+      user.email.toLowerCase() ===
+      cleanEmail
   )
 
   if (emailExists) {
@@ -73,6 +228,19 @@ export async function registerUser(username, email, password) {
     }
   }
 
+
+  // Generate a unique random salt
+  const passwordSalt = generateSalt()
+
+
+  // Hash the password using the generated salt
+  const passwordHash =
+    await hashPassword(
+      password,
+      passwordSalt
+    )
+
+
   const newUser = {
     id: crypto.randomUUID(),
 
@@ -80,24 +248,25 @@ export async function registerUser(username, email, password) {
 
     email: cleanEmail,
 
-    // TODO 4:
-    // Store the password value for now.
-    // Later C.4 will replace this with a safer passwordHash approach.
-    password: password,
+    passwordSalt,
+
+    passwordHash,
 
     role: 'user',
 
-    createdAt: new Date().toISOString()
+    createdAt:
+      new Date().toISOString()
   }
+
 
   users.push(newUser)
 
-  // TODO 5:
-  // Save the updated users array
   saveUsers(users)
+
 
   return {
     success: true,
+
     user: {
       id: newUser.id,
       username: newUser.username,
@@ -107,27 +276,75 @@ export async function registerUser(username, email, password) {
   }
 }
 
+
+// ======================================================
 // Login
-export async function loginUser(email, password) {
+// ======================================================
+
+export async function loginUser(
+  email,
+  password
+) {
   const users = getUsers()
 
-  const cleanEmail = email.trim().toLowerCase()
+  const cleanEmail =
+    email.trim().toLowerCase()
+
 
   const user = users.find(
-    (item) => item.email.toLowerCase() === cleanEmail
+    (item) =>
+      item.email.toLowerCase() ===
+      cleanEmail
   )
 
-  // TODO 6:
-  // Check:
-  // 1. user exists
-  // 2. entered password matches stored password
-  if (!user || user.password !== password) {
+
+  // User does not exist
+  if (!user) {
     return {
       success: false,
-      message: 'Invalid email or password.'
+      message:
+        'Invalid email or password.'
     }
   }
 
+
+  // Account does not contain secure password fields
+  if (
+    !user.passwordSalt ||
+    !user.passwordHash
+  ) {
+    return {
+      success: false,
+      message:
+        'Invalid email or password.'
+    }
+  }
+
+
+  // Hash the entered password using
+  // this user's stored salt
+  const enteredPasswordHash =
+    await hashPassword(
+      password,
+      user.passwordSalt
+    )
+
+
+  // Compare entered hash with stored hash
+  if (
+    enteredPasswordHash !==
+    user.passwordHash
+  ) {
+    return {
+      success: false,
+      message:
+        'Invalid email or password.'
+    }
+  }
+
+
+  // Only safe user information is stored
+  // for the current login session.
   const safeUser = {
     id: user.id,
     username: user.username,
@@ -135,15 +352,12 @@ export async function loginUser(email, password) {
     role: user.role
   }
 
-  // TODO 7:
-  // Save safeUser to CURRENT_USER_KEY
-  //
-  // Important:
-  // Do NOT save the user's password into zwvCurrentUser
+
   localStorage.setItem(
     CURRENT_USER_KEY,
     JSON.stringify(safeUser)
   )
+
 
   return {
     success: true,
@@ -151,44 +365,74 @@ export async function loginUser(email, password) {
   }
 }
 
+
+// ======================================================
 // Logout
+// ======================================================
+
 export function logoutUser() {
-  // TODO 8:
-  // Remove CURRENT_USER_KEY from localStorage
-  localStorage.removeItem(CURRENT_USER_KEY)
+  localStorage.removeItem(
+    CURRENT_USER_KEY
+  )
 }
 
+
+// ======================================================
 // Check whether someone is logged in
+// ======================================================
+
 export function isAuthenticated() {
-  // TODO 9:
-  // Return true when getCurrentUser() is not null
   return getCurrentUser() !== null
 }
 
+
+// ======================================================
 // Check administrator permission
+// ======================================================
+
 export function isAdmin() {
   const user = getCurrentUser()
 
-  // TODO 10:
-  // Return true only when:
-  // user exists
-  // AND user.role === 'admin'
-  return user !== null && user.role === 'admin'
+  return (
+    user !== null &&
+    user.role === 'admin'
+  )
 }
 
+
+// ======================================================
 // Create demo administrator
+// ======================================================
+
 export async function initializeDefaultAdmin() {
   const users = getUsers()
 
   const adminEmail = 'admin@zwv.com'
 
   const existingAdmin = users.find(
-    (user) => user.email.toLowerCase() === adminEmail
+    (user) =>
+      user.email.toLowerCase() ===
+      adminEmail
   )
 
   if (existingAdmin) {
     return
   }
+
+
+  // Generate a unique random salt
+  // for the administrator password
+  const adminPasswordSalt =
+    generateSalt()
+
+
+  // Hash the administrator password
+  const adminPasswordHash =
+    await hashPassword(
+      'Admin123!',
+      adminPasswordSalt
+    )
+
 
   const adminUser = {
     id: crypto.randomUUID(),
@@ -197,19 +441,20 @@ export async function initializeDefaultAdmin() {
 
     email: adminEmail,
 
-    // TODO 11:
-    // Choose your own demo password here.
-    // For C.4 we will improve the password handling.
-    password: 'Admin123!',
+    passwordSalt:
+      adminPasswordSalt,
+
+    passwordHash:
+      adminPasswordHash,
 
     role: 'admin',
 
-    createdAt: new Date().toISOString()
+    createdAt:
+      new Date().toISOString()
   }
+
 
   users.push(adminUser)
 
-  // TODO 12:
-  // Save the users array
   saveUsers(users)
 }
