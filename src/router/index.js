@@ -12,16 +12,21 @@ import RegisterView from '../views/RegisterView.vue'
 import AccountView from '../views/AccountView.vue'
 import AdminView from '../views/AdminView.vue'
 
-import { getCurrentUser } from '../services/authService'
+import {
+  getCurrentUser,
+  waitForAuthReady,
+} from '../services/authService'
 
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(
+    import.meta.env.BASE_URL,
+  ),
 
   routes: [
-    // =========================
+    // =====================================================
     // Public pages
-    // =========================
+    // =====================================================
     {
       path: '/',
       name: 'home',
@@ -40,9 +45,10 @@ const router = createRouter({
       component: SearchResultsView,
     },
 
-    // =========================
+
+    // =====================================================
     // Authentication pages
-    // =========================
+    // =====================================================
     {
       path: '/login',
       name: 'login',
@@ -55,9 +61,13 @@ const router = createRouter({
       component: RegisterView,
     },
 
-    // =========================
+
+    // =====================================================
     // Protected user page
-    // =========================
+    //
+    // Only authenticated Firebase users
+    // can access this route.
+    // =====================================================
     {
       path: '/account',
       name: 'account',
@@ -68,9 +78,14 @@ const router = createRouter({
       },
     },
 
-    // =========================
-    // Admin-only page
-    // =========================
+
+    // =====================================================
+    // Administrator-only page
+    //
+    // The user must:
+    // 1. Be authenticated
+    // 2. Have role === 'admin' in Firestore
+    // =====================================================
     {
       path: '/admin',
       name: 'admin',
@@ -83,7 +98,12 @@ const router = createRouter({
     },
   ],
 
-  // Return to the top whenever route changes
+
+  // =====================================================
+  // Scroll behaviour
+  //
+  // Return to the top whenever the route changes.
+  // =====================================================
   scrollBehavior() {
     return {
       top: 0,
@@ -96,69 +116,131 @@ const router = createRouter({
 // ======================================================
 // Global navigation guard
 //
-// Every time the user changes page,
-// this code checks authentication and role.
+// Firebase Authentication restores the login session
+// asynchronously when the application first loads.
+//
+// Therefore, before checking whether a user is logged in,
+// the router waits until Firebase has finished restoring
+// the authentication state.
 // ======================================================
 
-router.beforeEach((to) => {
-  const currentUser = getCurrentUser()
+router.beforeEach(
+  async (to) => {
 
-  // -----------------------------------------
-  // 1. User must log in before visiting
-  //    protected pages such as /account
-  // -----------------------------------------
-  if (to.meta.requiresAuth && !currentUser) {
-    return {
-      name: 'login',
-
-      // Remember where the user wanted to go
-      query: {
-        redirect: to.fullPath,
-      },
-    }
-  }
+    // --------------------------------------------------
+    // Wait for Firebase Authentication to finish
+    // restoring the current session.
+    //
+    // Without this step, refreshing /account or /admin
+    // could incorrectly redirect the user to /login
+    // before Firebase has finished loading the session.
+    // --------------------------------------------------
+    await waitForAuthReady()
 
 
-  // -----------------------------------------
-  // 2. Only administrators can access /admin
-  // -----------------------------------------
-  if (
-    to.meta.requiresAdmin &&
-    currentUser &&
-    currentUser.role !== 'admin'
-  ) {
-    return {
-      name: 'account',
-    }
-  }
+    // --------------------------------------------------
+    // Read the latest authenticated user profile.
+    //
+    // This profile combines:
+    // - Firebase Authentication identity
+    // - Firestore application profile
+    // - Firestore role information
+    // --------------------------------------------------
+    const currentUser =
+      getCurrentUser()
 
 
-  // -----------------------------------------
-  // 3. If already logged in,
-  //    do not allow Login/Register again
-  // -----------------------------------------
-  const isAuthPage =
-    to.name === 'login' ||
-    to.name === 'register'
+    // ==================================================
+    // 1. Protect authenticated routes
+    // ==================================================
+    //
+    // If a route requires authentication and no user
+    // is currently logged in, redirect to Login.
+    //
+    // The original destination is stored so that after
+    // successful login the user can return to the page
+    // they originally requested.
+    // ==================================================
 
-  if (currentUser && isAuthPage) {
-    if (currentUser.role === 'admin') {
+    if (
+      to.meta.requiresAuth &&
+      !currentUser
+    ) {
       return {
-        name: 'admin',
+        name: 'login',
+
+        query: {
+          redirect:
+            to.fullPath,
+        },
       }
     }
 
-    return {
-      name: 'account',
+
+    // ==================================================
+    // 2. Protect administrator-only routes
+    // ==================================================
+    //
+    // The /admin route requires role === 'admin'.
+    //
+    // Normal authenticated users are redirected to
+    // their own Account page.
+    // ==================================================
+
+    if (
+      to.meta.requiresAdmin &&
+      currentUser &&
+      currentUser.role !==
+        'admin'
+    ) {
+      return {
+        name: 'account',
+      }
     }
-  }
 
 
-  // -----------------------------------------
-  // 4. Everything else is allowed
-  // -----------------------------------------
-  return true
-})
+    // ==================================================
+    // 3. Prevent authenticated users from reopening
+    //    Login or Register pages
+    // ==================================================
+
+    const isAuthPage =
+      to.name === 'login' ||
+      to.name === 'register'
+
+
+    if (
+      currentUser &&
+      isAuthPage
+    ) {
+
+      // Administrator goes directly
+      // to the Admin Dashboard.
+      if (
+        currentUser.role ===
+        'admin'
+      ) {
+        return {
+          name: 'admin',
+        }
+      }
+
+
+      // Normal authenticated user goes
+      // directly to their Account page.
+      return {
+        name: 'account',
+      }
+    }
+
+
+    // ==================================================
+    // 4. Allow navigation
+    // ==================================================
+
+    return true
+  },
+)
 
 
 export default router

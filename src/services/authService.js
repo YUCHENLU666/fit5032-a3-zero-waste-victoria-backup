@@ -1,115 +1,155 @@
-const USERS_KEY = 'zwvUsers'
-const CURRENT_USER_KEY = 'zwvCurrentUser'
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth'
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore'
+
+import {
+  auth,
+  db,
+} from '../firebase'
 
 
 // ======================================================
-// Generate random salt
+// Current authenticated user profile
+// ======================================================
+//
+// Firebase Authentication stores the login session.
+//
+// Firestore stores extra application information such as:
+// - username
+// - role
+// - createdAt
+//
+// We cache the combined user profile here so existing
+// Vue components can access it synchronously after
+// Firebase has finished restoring the session.
 // ======================================================
 
-// Create a random 16-byte salt
-// and convert it into a hexadecimal string.
-function generateSalt() {
-  const bytes = new Uint8Array(16)
+let currentUserProfile = null
 
-  crypto.getRandomValues(bytes)
+const authSubscribers =
+  new Set()
 
-  return Array.from(bytes)
-    .map((byte) =>
-      byte.toString(16).padStart(2, '0')
-    )
-    .join('')
-}
+let resolveAuthReady
+
+const authReadyPromise =
+  new Promise((resolve) => {
+    resolveAuthReady = resolve
+  })
+
+let authReadyResolved = false
 
 
 // ======================================================
-// Hash password using Web Crypto PBKDF2
+// Notify components when authentication changes
 // ======================================================
 
-async function hashPassword(password, salt) {
-  const encoder = new TextEncoder()
-
-  // Convert password into bytes
-  const passwordData = encoder.encode(password)
-
-  // Import the password as key material
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    passwordData,
-    {
-      name: 'PBKDF2',
+function notifyAuthSubscribers() {
+  authSubscribers.forEach(
+    (callback) => {
+      callback(currentUserProfile)
     },
-    false,
-    ['deriveBits']
   )
-
-  // Convert the hexadecimal salt back into bytes
-  const saltBytes = new Uint8Array(
-    salt.match(/.{1,2}/g).map(
-      (byte) => parseInt(byte, 16)
-    )
-  )
-
-  // Derive a password hash
-  const derivedBits =
-    await crypto.subtle.deriveBits(
-      {
-        name: 'PBKDF2',
-        salt: saltBytes,
-        iterations: 100000,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      256
-    )
-
-  const hashBytes =
-    new Uint8Array(derivedBits)
-
-  // Convert hash bytes into hexadecimal
-  const hashParts =
-    Array.from(hashBytes).map(
-      (byte) =>
-        byte.toString(16).padStart(2, '0')
-    )
-
-  return hashParts.join('')
 }
 
 
 // ======================================================
-// Read all users from localStorage
+// Load application profile from Firestore
 // ======================================================
 
-export function getUsers() {
-  try {
-    const storedUsers =
-      localStorage.getItem(USERS_KEY)
+async function loadUserProfile(
+  firebaseUser,
+) {
+  if (!firebaseUser) {
+    return null
+  }
 
-    if (!storedUsers) {
-      return []
-    }
-
-    return JSON.parse(storedUsers)
-  } catch (error) {
-    console.error(
-      'Failed to load users:',
-      error
+  const profileReference =
+    doc(
+      db,
+      'users',
+      firebaseUser.uid,
     )
 
-    return []
+  const profileSnapshot =
+    await getDoc(profileReference)
+
+  if (profileSnapshot.exists()) {
+    return {
+      id: firebaseUser.uid,
+      uid: firebaseUser.uid,
+      ...profileSnapshot.data(),
+    }
+  }
+
+  // Safe fallback in case an Authentication account
+  // exists but its Firestore profile is missing.
+  return {
+    id: firebaseUser.uid,
+    uid: firebaseUser.uid,
+    username:
+      firebaseUser.displayName ||
+      'ZWV User',
+    email:
+      firebaseUser.email || '',
+    role: 'user',
   }
 }
 
 
 // ======================================================
-// Save all users to localStorage
+// Restore Firebase session when application starts
 // ======================================================
 
-function saveUsers(users) {
-  localStorage.setItem(
-    USERS_KEY,
-    JSON.stringify(users)
-  )
+onAuthStateChanged(
+  auth,
+  async (firebaseUser) => {
+    try {
+      currentUserProfile =
+        firebaseUser
+          ? await loadUserProfile(
+              firebaseUser,
+            )
+          : null
+    } catch (error) {
+      console.error(
+        'Failed to restore Firebase session:',
+        error,
+      )
+
+      currentUserProfile = null
+    }
+
+    if (!authReadyResolved) {
+      authReadyResolved = true
+      resolveAuthReady()
+    }
+
+    notifyAuthSubscribers()
+  },
+)
+
+
+// ======================================================
+// Wait until Firebase knows whether the user is logged in
+// ======================================================
+
+export async function waitForAuthReady() {
+  await authReadyPromise
 }
 
 
@@ -118,160 +158,188 @@ function saveUsers(users) {
 // ======================================================
 
 export function getCurrentUser() {
-  try {
-    const storedUser =
-      localStorage.getItem(CURRENT_USER_KEY)
+  return currentUserProfile
+}
 
-    if (!storedUser) {
-      return null
-    }
 
-    // Treat zwvCurrentUser only as
-    // session identity information.
-    const sessionUser =
-      JSON.parse(storedUser)
+// ======================================================
+// Subscribe to login/logout changes
+// ======================================================
 
-    // A valid session must contain a user id.
-    if (!sessionUser?.id) {
-      localStorage.removeItem(
-        CURRENT_USER_KEY
-      )
+export function subscribeToAuthState(
+  callback,
+) {
+  authSubscribers.add(callback)
 
-      return null
-    }
+  callback(currentUserProfile)
 
-    // Read the full account list.
-    const users = getUsers()
-
-    // Find the real account using
-    // the id stored in the session.
-    const realUser = users.find(
-      (user) =>
-        user.id === sessionUser.id
-    )
-
-    // If the account no longer exists,
-    // the session is invalid.
-    if (!realUser) {
-      localStorage.removeItem(
-        CURRENT_USER_KEY
-      )
-
-      return null
-    }
-
-    // Return safe account information
-    // from zwvUsers.
-    //
-    // Do not trust role, username or email
-    // stored inside zwvCurrentUser.
-    return {
-      id: realUser.id,
-      username: realUser.username,
-      email: realUser.email,
-      role: realUser.role,
-    }
-  } catch (error) {
-    console.error(
-      'Failed to load current user:',
-      error
-    )
-
-    // Remove invalid/corrupted session data.
-    localStorage.removeItem(
-      CURRENT_USER_KEY
-    )
-
-    return null
+  return () => {
+    authSubscribers.delete(callback)
   }
 }
 
 
 // ======================================================
-// Register new account
+// Register a new user
 // ======================================================
 
 export async function registerUser(
   username,
   email,
-  password
+  password,
 ) {
-  const users = getUsers()
+  const cleanUsername =
+    username.trim()
 
-  const cleanUsername = username.trim()
   const cleanEmail =
     email.trim().toLowerCase()
 
-  const usernameExists = users.some(
-    (user) =>
-      user.username.toLowerCase() ===
-      cleanUsername.toLowerCase()
-  )
+  try {
+    // ----------------------------------------------
+    // Check whether this username already exists
+    // ----------------------------------------------
 
-  if (usernameExists) {
-    return {
-      success: false,
-      message: 'Username already exists.'
+    const usernameQuery =
+      query(
+        collection(db, 'users'),
+        where(
+          'usernameLower',
+          '==',
+          cleanUsername.toLowerCase(),
+        ),
+        limit(1),
+      )
+
+    const usernameSnapshot =
+      await getDocs(usernameQuery)
+
+    if (!usernameSnapshot.empty) {
+      return {
+        success: false,
+        message:
+          'Username already exists.',
+      }
     }
-  }
-
-  const emailExists = users.some(
-    (user) =>
-      user.email.toLowerCase() ===
-      cleanEmail
-  )
-
-  if (emailExists) {
-    return {
-      success: false,
-      message: 'Email already exists.'
-    }
-  }
 
 
-  // Generate a unique random salt
-  const passwordSalt = generateSalt()
+    // ----------------------------------------------
+    // Create Firebase Authentication account
+    // ----------------------------------------------
+
+    const credential =
+      await createUserWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        password,
+      )
+
+    const firebaseUser =
+      credential.user
 
 
-  // Hash the password using the generated salt
-  const passwordHash =
-    await hashPassword(
-      password,
-      passwordSalt
+    // ----------------------------------------------
+    // Store display name in Firebase Authentication
+    // ----------------------------------------------
+
+    await updateProfile(
+      firebaseUser,
+      {
+        displayName:
+          cleanUsername,
+      },
     )
 
 
-  const newUser = {
-    id: crypto.randomUUID(),
+    // ----------------------------------------------
+    // Create user profile in Firestore
+    // ----------------------------------------------
 
-    username: cleanUsername,
+    const userProfile = {
+      username:
+        cleanUsername,
 
-    email: cleanEmail,
+      usernameLower:
+        cleanUsername.toLowerCase(),
 
-    passwordSalt,
+      email:
+        cleanEmail,
 
-    passwordHash,
+      role:
+        'user',
 
-    role: 'user',
+      createdAt:
+        new Date().toISOString(),
+    }
 
-    createdAt:
-      new Date().toISOString()
-  }
+    await setDoc(
+      doc(
+        db,
+        'users',
+        firebaseUser.uid,
+      ),
+      userProfile,
+    )
 
 
-  users.push(newUser)
+    // Registration page currently sends users
+    // to the Login page, so sign them out after
+    // successfully creating their account.
+    await signOut(auth)
 
-  saveUsers(users)
+    return {
+      success: true,
 
+      user: {
+        id:
+          firebaseUser.uid,
 
-  return {
-    success: true,
+        uid:
+          firebaseUser.uid,
 
-    user: {
-      id: newUser.id,
-      username: newUser.username,
-      email: newUser.email,
-      role: newUser.role
+        ...userProfile,
+      },
+    }
+  } catch (error) {
+    console.error(
+      'Firebase registration error:',
+      error,
+    )
+
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        return {
+          success: false,
+          message:
+            'Email already exists.',
+        }
+
+      case 'auth/invalid-email':
+        return {
+          success: false,
+          message:
+            'Please enter a valid email address.',
+        }
+
+      case 'auth/weak-password':
+        return {
+          success: false,
+          message:
+            'The password is too weak.',
+        }
+
+      case 'auth/network-request-failed':
+        return {
+          success: false,
+          message:
+            'Network error. Please try again.',
+        }
+
+      default:
+        return {
+          success: false,
+          message:
+            'Unable to create account. Please try again.',
+        }
     }
   }
 }
@@ -283,85 +351,84 @@ export async function registerUser(
 
 export async function loginUser(
   email,
-  password
+  password,
 ) {
-  const users = getUsers()
-
   const cleanEmail =
     email.trim().toLowerCase()
 
+  try {
+    const credential =
+      await signInWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        password,
+      )
 
-  const user = users.find(
-    (item) =>
-      item.email.toLowerCase() ===
-      cleanEmail
-  )
+    const profile =
+      await loadUserProfile(
+        credential.user,
+      )
 
+    currentUserProfile =
+      profile
 
-  // User does not exist
-  if (!user) {
+    notifyAuthSubscribers()
+
     return {
-      success: false,
-      message:
-        'Invalid email or password.'
+      success: true,
+      user: profile,
     }
-  }
-
-
-  // Account does not contain secure password fields
-  if (
-    !user.passwordSalt ||
-    !user.passwordHash
-  ) {
-    return {
-      success: false,
-      message:
-        'Invalid email or password.'
-    }
-  }
-
-
-  // Hash the entered password using
-  // this user's stored salt
-  const enteredPasswordHash =
-    await hashPassword(
-      password,
-      user.passwordSalt
+  } catch (error) {
+    console.error(
+      'Firebase login error:',
+      error,
     )
 
+    switch (error.code) {
+      case 'auth/invalid-credential':
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        return {
+          success: false,
+          message:
+            'Invalid email or password.',
+        }
 
-  // Compare entered hash with stored hash
-  if (
-    enteredPasswordHash !==
-    user.passwordHash
-  ) {
-    return {
-      success: false,
-      message:
-        'Invalid email or password.'
+      case 'auth/invalid-email':
+        return {
+          success: false,
+          message:
+            'Please enter a valid email address.',
+        }
+
+      case 'auth/user-disabled':
+        return {
+          success: false,
+          message:
+            'This account has been disabled.',
+        }
+
+      case 'auth/too-many-requests':
+        return {
+          success: false,
+          message:
+            'Too many login attempts. Please try again later.',
+        }
+
+      case 'auth/network-request-failed':
+        return {
+          success: false,
+          message:
+            'Network error. Please try again.',
+        }
+
+      default:
+        return {
+          success: false,
+          message:
+            'Unable to log in. Please try again.',
+        }
     }
-  }
-
-
-  // Only safe user information is stored
-  // for the current login session.
-  const safeUser = {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    role: user.role
-  }
-
-
-  localStorage.setItem(
-    CURRENT_USER_KEY,
-    JSON.stringify(safeUser)
-  )
-
-
-  return {
-    success: true,
-    user: safeUser
   }
 }
 
@@ -370,91 +437,55 @@ export async function loginUser(
 // Logout
 // ======================================================
 
-export function logoutUser() {
-  localStorage.removeItem(
-    CURRENT_USER_KEY
-  )
+export async function logoutUser() {
+  await signOut(auth)
+
+  currentUserProfile = null
+
+  notifyAuthSubscribers()
 }
 
 
 // ======================================================
-// Check whether someone is logged in
+// Authentication helpers
 // ======================================================
 
 export function isAuthenticated() {
-  return getCurrentUser() !== null
+  return currentUserProfile !== null
 }
 
-
-// ======================================================
-// Check administrator permission
-// ======================================================
 
 export function isAdmin() {
-  const user = getCurrentUser()
-
   return (
-    user !== null &&
-    user.role === 'admin'
+    currentUserProfile !== null &&
+    currentUserProfile.role ===
+      'admin'
   )
 }
 
 
 // ======================================================
-// Create demo administrator
+// Load all user profiles
+//
+// Used by the administrator dashboard.
+// Firestore security rules will later restrict this.
 // ======================================================
 
-export async function initializeDefaultAdmin() {
-  const users = getUsers()
-
-  const adminEmail = 'admin@zwv.com'
-
-  const existingAdmin = users.find(
-    (user) =>
-      user.email.toLowerCase() ===
-      adminEmail
-  )
-
-  if (existingAdmin) {
-    return
-  }
-
-
-  // Generate a unique random salt
-  // for the administrator password
-  const adminPasswordSalt =
-    generateSalt()
-
-
-  // Hash the administrator password
-  const adminPasswordHash =
-    await hashPassword(
-      'Admin123!',
-      adminPasswordSalt
+export async function getUsers() {
+  const snapshot =
+    await getDocs(
+      collection(
+        db,
+        'users',
+      ),
     )
 
+  return snapshot.docs.map(
+    (userDocument) => ({
+      id:
+        userDocument.id,
 
-  const adminUser = {
-    id: crypto.randomUUID(),
-
-    username: 'ZWV Admin',
-
-    email: adminEmail,
-
-    passwordSalt:
-      adminPasswordSalt,
-
-    passwordHash:
-      adminPasswordHash,
-
-    role: 'admin',
-
-    createdAt:
-      new Date().toISOString()
-  }
-
-
-  users.push(adminUser)
-
-  saveUsers(users)
+      ...userDocument.data(),
+    }),
+  )
 }

@@ -1,51 +1,70 @@
 <script setup>
-import { ref, watch } from 'vue'
+import {
+  onUnmounted,
+  ref,
+} from 'vue'
+
 import {
   RouterLink,
-  useRoute,
   useRouter,
 } from 'vue-router'
 
 import {
-  getCurrentUser,
   logoutUser,
+  subscribeToAuthState,
 } from '../services/authService'
 
-const route = useRoute()
 const router = useRouter()
 
-// Store the current logged-in user
 const currentUser = ref(null)
 
-// Read the latest login state from localStorage
-const refreshCurrentUser = () => {
-  currentUser.value = getCurrentUser()
-}
 
-// Refresh authentication state whenever the route changes.
-// This allows the navbar to update immediately after login/register.
-watch(
-  () => route.fullPath,
-  () => {
-    refreshCurrentUser()
-  },
-  {
-    immediate: true,
+// ======================================================
+// Listen for Firebase authentication changes
+// ======================================================
+//
+// Unlike the previous LocalStorage implementation,
+// Firebase authentication state can change asynchronously.
+//
+// The navbar therefore subscribes directly to the
+// authentication service instead of checking LocalStorage
+// whenever the route changes.
+// ======================================================
+
+const unsubscribe =
+  subscribeToAuthState(
+    (user) => {
+      currentUser.value =
+        user
+    },
+  )
+
+
+// Stop listening when this component is destroyed.
+onUnmounted(() => {
+  unsubscribe()
+})
+
+
+// ======================================================
+// Logout
+// ======================================================
+
+const handleLogout =
+  async () => {
+    try {
+      await logoutUser()
+
+      await router.push('/')
+    } catch (error) {
+      console.error(
+        'Logout failed:',
+        error,
+      )
+    }
   }
-)
-
-// Log the current user out
-const handleLogout = () => {
-  // Remove the current user from localStorage
-  logoutUser()
-
-  // Immediately update navbar state
-  currentUser.value = null
-
-  // Return to homepage
-  router.push('/')
-}
 </script>
+
 
 <template>
   <nav
@@ -60,10 +79,7 @@ const handleLogout = () => {
   >
     <div class="container">
 
-      <!-- ========================= -->
       <!-- Brand -->
-      <!-- ========================= -->
-
       <RouterLink
         class="navbar-brand fw-bold"
         to="/"
@@ -72,10 +88,7 @@ const handleLogout = () => {
       </RouterLink>
 
 
-      <!-- ========================= -->
-      <!-- Mobile navigation button -->
-      <!-- ========================= -->
-
+      <!-- Mobile navigation -->
       <button
         class="navbar-toggler"
         type="button"
@@ -85,13 +98,11 @@ const handleLogout = () => {
         aria-expanded="false"
         aria-label="Toggle navigation"
       >
-        <span class="navbar-toggler-icon"></span>
+        <span
+          class="navbar-toggler-icon"
+        ></span>
       </button>
 
-
-      <!-- ========================= -->
-      <!-- Navigation links -->
-      <!-- ========================= -->
 
       <div
         id="mainNavbar"
@@ -127,13 +138,13 @@ const handleLogout = () => {
           </li>
 
 
-          <!-- ================================================== -->
-          <!-- Guest navigation -->
-          <!-- ================================================== -->
+          <!-- =============================== -->
+          <!-- Guest -->
+          <!-- =============================== -->
 
-          <template v-if="!currentUser">
-
-            <!-- Login -->
+          <template
+            v-if="!currentUser"
+          >
             <li class="nav-item">
               <RouterLink
                 class="nav-link"
@@ -143,9 +154,9 @@ const handleLogout = () => {
               </RouterLink>
             </li>
 
-
-            <!-- Register -->
-            <li class="nav-item ms-lg-2">
+            <li
+              class="nav-item ms-lg-2"
+            >
               <RouterLink
                 class="
                   btn
@@ -159,20 +170,21 @@ const handleLogout = () => {
                 Register
               </RouterLink>
             </li>
-
           </template>
 
 
-          <!-- ================================================== -->
-          <!-- Logged-in user navigation -->
-          <!-- ================================================== -->
+          <!-- =============================== -->
+          <!-- Authenticated user -->
+          <!-- =============================== -->
 
           <template v-else>
 
-            <!-- Admin page:
-                 only visible to administrators -->
+            <!-- Admin only -->
             <li
-              v-if="currentUser.role === 'admin'"
+              v-if="
+                currentUser.role ===
+                'admin'
+              "
               class="nav-item"
             >
               <RouterLink
@@ -184,7 +196,7 @@ const handleLogout = () => {
             </li>
 
 
-            <!-- User account -->
+            <!-- Account -->
             <li class="nav-item">
               <RouterLink
                 class="nav-link"
@@ -195,7 +207,7 @@ const handleLogout = () => {
             </li>
 
 
-            <!-- Current username -->
+            <!-- Username -->
             <li class="nav-item">
               <span
                 class="
@@ -204,13 +216,16 @@ const handleLogout = () => {
                   fw-semibold
                 "
               >
-                Hi, {{ currentUser.username }}
+                Hi,
+                {{ currentUser.username }}
               </span>
             </li>
 
 
             <!-- Logout -->
-            <li class="nav-item ms-lg-2">
+            <li
+              class="nav-item ms-lg-2"
+            >
               <button
                 type="button"
                 class="

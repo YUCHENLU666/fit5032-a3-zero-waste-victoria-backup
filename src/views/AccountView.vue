@@ -1,46 +1,103 @@
 <script setup>
-import { computed } from 'vue'
+import {
+  computed,
+  onUnmounted,
+  ref,
+} from 'vue'
+
 import {
   getCurrentUser,
-  getUsers,
+  subscribeToAuthState,
 } from '../services/authService'
 
-// Current logged-in user only contains safe information
-const currentUser = getCurrentUser()
 
-// Read full account list so we can also get createdAt
-const users = getUsers()
+// ======================================================
+// Current authenticated Firebase user
+// ======================================================
+//
+// The router waits for Firebase Authentication to finish
+// restoring the session before this protected page opens.
+//
+// We still subscribe to authentication changes so that
+// this page stays in sync if the Firebase session changes.
+// ======================================================
 
-// Find the full account that matches the logged-in user
-const account = computed(() => {
-  return (
-    users.find(
-      (user) => user.id === currentUser?.id
-    ) || currentUser
+const account =
+  ref(
+    getCurrentUser(),
   )
+
+
+const unsubscribe =
+  subscribeToAuthState(
+    (user) => {
+      account.value = user
+    },
+  )
+
+
+onUnmounted(() => {
+  unsubscribe()
 })
 
-// Display joining date in a readable format
-const joinedDate = computed(() => {
-  if (!account.value?.createdAt) {
-    return 'Not available'
-  }
 
-  return new Date(
-    account.value.createdAt
-  ).toLocaleDateString('en-AU', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+// ======================================================
+// Member since
+// ======================================================
+
+const joinedDate =
+  computed(() => {
+    const createdAt =
+      account.value?.createdAt
+
+    if (!createdAt) {
+      return 'Not available'
+    }
+
+
+    // Support both:
+    // 1. ISO date strings
+    // 2. Firestore Timestamp objects
+    const date =
+      typeof createdAt?.toDate ===
+      'function'
+        ? createdAt.toDate()
+        : new Date(createdAt)
+
+
+    if (
+      Number.isNaN(
+        date.getTime(),
+      )
+    ) {
+      return 'Not available'
+    }
+
+
+    return date.toLocaleDateString(
+      'en-AU',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      },
+    )
   })
-})
 
-// Human-readable role name
-const roleLabel = computed(() => {
-  return account.value?.role === 'admin'
-    ? 'Administrator'
-    : 'Community User'
-})
+
+// ======================================================
+// Human-readable role
+// ======================================================
+
+const roleLabel =
+  computed(() => {
+    return (
+      account.value?.role ===
+      'admin'
+        ? 'Administrator'
+        : 'Community User'
+    )
+  })
 </script>
 
 
@@ -48,17 +105,24 @@ const roleLabel = computed(() => {
   <main class="bg-light py-5">
     <div class="container">
 
-      <!-- ========================= -->
+      <!-- ================================================= -->
       <!-- Page header -->
-      <!-- ========================= -->
+      <!-- ================================================= -->
 
       <div class="mb-4">
-        <p class="text-success fw-semibold mb-2">
+        <p
+          class="
+            text-success
+            fw-semibold
+            mb-2
+          "
+        >
           MY ACCOUNT
         </p>
 
         <h1 class="fw-bold mb-2">
-          Welcome, {{ account?.username }}
+          Welcome,
+          {{ account?.username }}
         </h1>
 
         <p class="text-muted mb-0">
@@ -67,15 +131,29 @@ const roleLabel = computed(() => {
       </div>
 
 
-      <div class="row g-4">
+      <!-- ================================================= -->
+      <!-- Account loaded -->
+      <!-- ================================================= -->
 
-        <!-- ========================= -->
+      <div
+        v-if="account"
+        class="row g-4"
+      >
+
+        <!-- ================================================= -->
         <!-- Account information -->
-        <!-- ========================= -->
+        <!-- ================================================= -->
 
         <div class="col-12 col-lg-8">
 
-          <div class="card border-0 shadow-sm">
+          <div
+            class="
+              card
+              border-0
+              shadow-sm
+              h-100
+            "
+          >
             <div class="card-body p-4">
 
               <h2 class="h4 fw-bold mb-4">
@@ -84,44 +162,86 @@ const roleLabel = computed(() => {
 
 
               <!-- Username -->
-              <div class="row py-3 border-bottom">
-
-                <div class="col-5 text-muted">
+              <div
+                class="
+                  row
+                  py-3
+                  border-bottom
+                "
+              >
+                <div
+                  class="
+                    col-5
+                    text-muted
+                  "
+                >
                   Username
                 </div>
 
-                <div class="col-7 fw-semibold">
-                  {{ account?.username }}
+                <div
+                  class="
+                    col-7
+                    fw-semibold
+                  "
+                >
+                  {{ account.username }}
                 </div>
-
               </div>
 
 
               <!-- Email -->
-              <div class="row py-3 border-bottom">
-
-                <div class="col-5 text-muted">
+              <div
+                class="
+                  row
+                  py-3
+                  border-bottom
+                "
+              >
+                <div
+                  class="
+                    col-5
+                    text-muted
+                  "
+                >
                   Email
                 </div>
 
-                <div class="col-7 fw-semibold">
-                  {{ account?.email }}
+                <div
+                  class="
+                    col-7
+                    fw-semibold
+                    text-break
+                  "
+                >
+                  {{ account.email }}
                 </div>
-
               </div>
 
 
               <!-- Role -->
-              <div class="row py-3 border-bottom">
-
-                <div class="col-5 text-muted">
+              <div
+                class="
+                  row
+                  py-3
+                  border-bottom
+                "
+              >
+                <div
+                  class="
+                    col-5
+                    text-muted
+                  "
+                >
                   Account Type
                 </div>
 
                 <div class="col-7">
 
                   <span
-                    v-if="account?.role === 'admin'"
+                    v-if="
+                      account.role ===
+                      'admin'
+                    "
                     class="badge bg-dark"
                   >
                     {{ roleLabel }}
@@ -129,27 +249,42 @@ const roleLabel = computed(() => {
 
                   <span
                     v-else
-                    class="badge bg-success"
+                    class="
+                      badge
+                      bg-success
+                    "
                   >
                     {{ roleLabel }}
                   </span>
 
                 </div>
-
               </div>
 
 
               <!-- Member since -->
-              <div class="row py-3">
-
-                <div class="col-5 text-muted">
+              <div
+                class="
+                  row
+                  py-3
+                "
+              >
+                <div
+                  class="
+                    col-5
+                    text-muted
+                  "
+                >
                   Member Since
                 </div>
 
-                <div class="col-7 fw-semibold">
+                <div
+                  class="
+                    col-7
+                    fw-semibold
+                  "
+                >
                   {{ joinedDate }}
                 </div>
-
               </div>
 
             </div>
@@ -158,13 +293,20 @@ const roleLabel = computed(() => {
         </div>
 
 
-        <!-- ========================= -->
-        <!-- Account access status -->
-        <!-- ========================= -->
+        <!-- ================================================= -->
+        <!-- Authentication status -->
+        <!-- ================================================= -->
 
         <div class="col-12 col-lg-4">
 
-          <div class="card border-0 shadow-sm h-100">
+          <div
+            class="
+              card
+              border-0
+              shadow-sm
+              h-100
+            "
+          >
             <div class="card-body p-4">
 
               <h2 class="h5 fw-bold mb-4">
@@ -172,27 +314,39 @@ const roleLabel = computed(() => {
               </h2>
 
 
-              <div class="d-flex align-items-center mb-3">
-
+              <!-- Signed in -->
+              <div
+                class="
+                  d-flex
+                  align-items-center
+                  mb-4
+                "
+              >
                 <span class="fs-4 me-3">
                   ✅
                 </span>
 
                 <div>
                   <div class="fw-semibold">
-                    Signed In
+                    Firebase Signed In
                   </div>
 
                   <small class="text-muted">
-                    Your account is authenticated.
+                    Your identity is authenticated
+                    using Firebase Authentication.
                   </small>
                 </div>
-
               </div>
 
 
-              <div class="d-flex align-items-center mb-3">
-
+              <!-- Protected route -->
+              <div
+                class="
+                  d-flex
+                  align-items-center
+                  mb-4
+                "
+              >
                 <span class="fs-4 me-3">
                   🔐
                 </span>
@@ -203,29 +357,34 @@ const roleLabel = computed(() => {
                   </div>
 
                   <small class="text-muted">
-                    This page requires authentication.
+                    This page is protected by
+                    a Vue Router authentication guard.
                   </small>
                 </div>
-
               </div>
 
 
-              <div class="d-flex align-items-center">
-
+              <!-- Firestore profile -->
+              <div
+                class="
+                  d-flex
+                  align-items-center
+                "
+              >
                 <span class="fs-4 me-3">
-                  ♻️
+                  ☁️
                 </span>
 
                 <div>
                   <div class="fw-semibold">
-                    Circular Hub Member
+                    Firestore Profile
                   </div>
 
                   <small class="text-muted">
-                    You can participate in community features.
+                    Your application profile and role
+                    are stored in Cloud Firestore.
                   </small>
                 </div>
-
               </div>
 
             </div>
@@ -236,11 +395,35 @@ const roleLabel = computed(() => {
       </div>
 
 
-      <!-- ========================= -->
-      <!-- Future rating area -->
-      <!-- ========================= -->
+      <!-- ================================================= -->
+      <!-- Profile unavailable -->
+      <!-- ================================================= -->
 
-      <div class="card border-0 shadow-sm mt-4">
+      <div
+        v-else
+        class="
+          alert
+          alert-warning
+        "
+        role="alert"
+      >
+        Your account information is currently unavailable.
+      </div>
+
+
+      <!-- ================================================= -->
+      <!-- Community activity -->
+      <!-- ================================================= -->
+
+      <div
+        v-if="account"
+        class="
+          card
+          border-0
+          shadow-sm
+          mt-4
+        "
+      >
         <div class="card-body p-4">
 
           <h2 class="h5 fw-bold mb-2">
@@ -248,7 +431,9 @@ const roleLabel = computed(() => {
           </h2>
 
           <p class="text-muted mb-0">
-            Your recycling location ratings will appear here.
+            Your recycling location ratings
+            and future community activity
+            will appear here.
           </p>
 
         </div>
