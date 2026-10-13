@@ -11,10 +11,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  limit,
-  query,
   setDoc,
-  where,
 } from 'firebase/firestore'
 
 import {
@@ -27,48 +24,86 @@ import {
 // Current authenticated user profile
 // ======================================================
 //
-// Firebase Authentication stores the login session.
+// Firebase Authentication manages:
+// - Login session
+// - Email/password authentication
+// - Firebase UID
 //
-// Firestore stores extra application information such as:
-// - username
-// - role
-// - createdAt
+// Cloud Firestore stores additional application data:
+// - Username
+// - Email
+// - Role
+// - Account creation date
 //
-// We cache the combined user profile here so existing
-// Vue components can access it synchronously after
-// Firebase has finished restoring the session.
+// The combined user profile is cached here so that
+// Vue components and Vue Router can access it after
+// Firebase finishes restoring the login session.
 // ======================================================
 
 let currentUserProfile = null
 
+
+// ======================================================
+// Authentication subscribers
+// ======================================================
+//
+// Components such as AppNavbar.vue and AccountView.vue
+// subscribe to authentication changes.
+//
+// Whenever a user logs in or logs out, all subscribers
+// are notified automatically.
+// ======================================================
+
 const authSubscribers =
   new Set()
 
-let resolveAuthReady
-
-const authReadyPromise =
-  new Promise((resolve) => {
-    resolveAuthReady = resolve
-  })
-
-let authReadyResolved = false
-
-
-// ======================================================
-// Notify components when authentication changes
-// ======================================================
 
 function notifyAuthSubscribers() {
   authSubscribers.forEach(
     (callback) => {
-      callback(currentUserProfile)
+      callback(
+        currentUserProfile,
+      )
     },
   )
 }
 
 
 // ======================================================
-// Load application profile from Firestore
+// Firebase authentication readiness
+// ======================================================
+//
+// Firebase restores an existing login asynchronously.
+//
+// The router must wait for this process before deciding
+// whether a protected page can be opened.
+//
+// Otherwise, refreshing /account or /admin could
+// incorrectly redirect a logged-in user to /login.
+// ======================================================
+
+let resolveAuthReady
+
+const authReadyPromise =
+  new Promise((resolve) => {
+    resolveAuthReady =
+      resolve
+  })
+
+let authReadyResolved =
+  false
+
+
+// ======================================================
+// Load Firestore profile
+// ======================================================
+//
+// Firebase Authentication only provides identity data.
+//
+// Application-specific information such as username
+// and role is stored in Firestore under:
+//
+// users/{firebaseUid}
 // ======================================================
 
 async function loadUserProfile(
@@ -78,6 +113,7 @@ async function loadUserProfile(
     return null
   }
 
+
   const profileReference =
     doc(
       db,
@@ -85,59 +121,108 @@ async function loadUserProfile(
       firebaseUser.uid,
     )
 
-  const profileSnapshot =
-    await getDoc(profileReference)
 
-  if (profileSnapshot.exists()) {
+  const profileSnapshot =
+    await getDoc(
+      profileReference,
+    )
+
+
+  // ------------------------------------------------------
+  // Firestore profile exists
+  // ------------------------------------------------------
+
+  if (
+    profileSnapshot.exists()
+  ) {
     return {
-      id: firebaseUser.uid,
-      uid: firebaseUser.uid,
+      id:
+        firebaseUser.uid,
+
+      uid:
+        firebaseUser.uid,
+
       ...profileSnapshot.data(),
     }
   }
 
-  // Safe fallback in case an Authentication account
-  // exists but its Firestore profile is missing.
+
+  // ------------------------------------------------------
+  // Safe fallback
+  //
+  // This should rarely happen, but it prevents the
+  // application from breaking if a Firebase Authentication
+  // account exists without a matching Firestore profile.
+  // ------------------------------------------------------
+
   return {
-    id: firebaseUser.uid,
-    uid: firebaseUser.uid,
+    id:
+      firebaseUser.uid,
+
+    uid:
+      firebaseUser.uid,
+
     username:
       firebaseUser.displayName ||
       'ZWV User',
+
     email:
-      firebaseUser.email || '',
-    role: 'user',
+      firebaseUser.email ||
+      '',
+
+    role:
+      'user',
   }
 }
 
 
 // ======================================================
-// Restore Firebase session when application starts
+// Restore Firebase login session
+// ======================================================
+//
+// Firebase automatically remembers authenticated users.
+//
+// When the application starts, onAuthStateChanged()
+// determines whether a valid session already exists.
 // ======================================================
 
 onAuthStateChanged(
   auth,
+
   async (firebaseUser) => {
     try {
-      currentUserProfile =
-        firebaseUser
-          ? await loadUserProfile(
-              firebaseUser,
-            )
-          : null
+
+      if (firebaseUser) {
+        currentUserProfile =
+          await loadUserProfile(
+            firebaseUser,
+          )
+      } else {
+        currentUserProfile =
+          null
+      }
+
     } catch (error) {
+
       console.error(
         'Failed to restore Firebase session:',
         error,
       )
 
-      currentUserProfile = null
+      currentUserProfile =
+        null
     }
 
+
+    // Resolve only once:
+    // Firebase has now checked the initial session.
     if (!authReadyResolved) {
-      authReadyResolved = true
+      authReadyResolved =
+        true
+
       resolveAuthReady()
     }
+
 
     notifyAuthSubscribers()
   },
@@ -145,7 +230,7 @@ onAuthStateChanged(
 
 
 // ======================================================
-// Wait until Firebase knows whether the user is logged in
+// Wait for Firebase session restoration
 // ======================================================
 
 export async function waitForAuthReady() {
@@ -154,7 +239,7 @@ export async function waitForAuthReady() {
 
 
 // ======================================================
-// Get current logged-in user
+// Get current authenticated user
 // ======================================================
 
 export function getCurrentUser() {
@@ -163,24 +248,56 @@ export function getCurrentUser() {
 
 
 // ======================================================
-// Subscribe to login/logout changes
+// Subscribe to authentication changes
+// ======================================================
+//
+// Returns an unsubscribe function so Vue components
+// can stop listening when they are destroyed.
 // ======================================================
 
 export function subscribeToAuthState(
   callback,
 ) {
-  authSubscribers.add(callback)
+  authSubscribers.add(
+    callback,
+  )
 
-  callback(currentUserProfile)
+
+  // Immediately provide the latest state.
+  callback(
+    currentUserProfile,
+  )
+
 
   return () => {
-    authSubscribers.delete(callback)
+    authSubscribers.delete(
+      callback,
+    )
   }
 }
 
 
 // ======================================================
-// Register a new user
+// Register user
+// ======================================================
+//
+// Registration process:
+//
+// 1. Clean user input.
+// 2. Create Firebase Authentication account.
+// 3. Store username as Firebase displayName.
+// 4. Create Firestore application profile.
+// 5. Every newly registered account receives role "user".
+// 6. Sign the user out.
+// 7. Registration page redirects to Login.
+//
+// Firebase Authentication already guarantees that
+// email addresses are unique.
+//
+// Username uniqueness is intentionally not enforced
+// by querying the complete users collection because
+// unauthenticated users should not have permission
+// to read all account profiles.
 // ======================================================
 
 export async function registerUser(
@@ -188,43 +305,22 @@ export async function registerUser(
   email,
   password,
 ) {
+
   const cleanUsername =
     username.trim()
 
+
   const cleanEmail =
-    email.trim().toLowerCase()
+    email
+      .trim()
+      .toLowerCase()
+
 
   try {
-    // ----------------------------------------------
-    // Check whether this username already exists
-    // ----------------------------------------------
 
-    const usernameQuery =
-      query(
-        collection(db, 'users'),
-        where(
-          'usernameLower',
-          '==',
-          cleanUsername.toLowerCase(),
-        ),
-        limit(1),
-      )
-
-    const usernameSnapshot =
-      await getDocs(usernameQuery)
-
-    if (!usernameSnapshot.empty) {
-      return {
-        success: false,
-        message:
-          'Username already exists.',
-      }
-    }
-
-
-    // ----------------------------------------------
-    // Create Firebase Authentication account
-    // ----------------------------------------------
+    // ==================================================
+    // 1. Create Firebase Authentication account
+    // ==================================================
 
     const credential =
       await createUserWithEmailAndPassword(
@@ -233,13 +329,14 @@ export async function registerUser(
         password,
       )
 
+
     const firebaseUser =
       credential.user
 
 
-    // ----------------------------------------------
-    // Store display name in Firebase Authentication
-    // ----------------------------------------------
+    // ==================================================
+    // 2. Store display name in Firebase Authentication
+    // ==================================================
 
     await updateProfile(
       firebaseUser,
@@ -250,16 +347,24 @@ export async function registerUser(
     )
 
 
-    // ----------------------------------------------
-    // Create user profile in Firestore
-    // ----------------------------------------------
+    // ==================================================
+    // 3. Build Firestore profile
+    // ==================================================
+    //
+    // Security rule will later enforce that newly
+    // registered users MUST have role "user".
+    //
+    // This prevents clients from creating themselves
+    // as administrators.
+    // ==================================================
 
     const userProfile = {
       username:
         cleanUsername,
 
       usernameLower:
-        cleanUsername.toLowerCase(),
+        cleanUsername
+          .toLowerCase(),
 
       email:
         cleanEmail,
@@ -268,8 +373,14 @@ export async function registerUser(
         'user',
 
       createdAt:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
     }
+
+
+    // ==================================================
+    // 4. Save Firestore profile
+    // ==================================================
 
     await setDoc(
       doc(
@@ -277,17 +388,27 @@ export async function registerUser(
         'users',
         firebaseUser.uid,
       ),
+
       userProfile,
     )
 
 
-    // Registration page currently sends users
-    // to the Login page, so sign them out after
-    // successfully creating their account.
-    await signOut(auth)
+    // ==================================================
+    // 5. Sign out after successful registration
+    // ==================================================
+    //
+    // The existing RegisterView redirects users to
+    // /login after successful account creation.
+    // ==================================================
+
+    await signOut(
+      auth,
+    )
+
 
     return {
-      success: true,
+      success:
+        true,
 
       user: {
         id:
@@ -299,44 +420,74 @@ export async function registerUser(
         ...userProfile,
       },
     }
+
   } catch (error) {
+
     console.error(
       'Firebase registration error:',
       error,
     )
 
-    switch (error.code) {
+
+    switch (
+      error.code
+    ) {
+
       case 'auth/email-already-in-use':
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Email already exists.',
         }
 
+
       case 'auth/invalid-email':
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Please enter a valid email address.',
         }
 
+
       case 'auth/weak-password':
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'The password is too weak.',
         }
 
+
       case 'auth/network-request-failed':
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Network error. Please try again.',
         }
 
+
+      case 'permission-denied':
+        return {
+          success:
+            false,
+
+          message:
+            'Unable to create the user profile because database access was denied.',
+        }
+
+
       default:
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Unable to create account. Please try again.',
         }
@@ -346,17 +497,32 @@ export async function registerUser(
 
 
 // ======================================================
-// Login
+// Login user
+// ======================================================
+//
+// Firebase Authentication verifies the email/password.
+//
+// After successful authentication, the corresponding
+// application profile is loaded from Firestore.
 // ======================================================
 
 export async function loginUser(
   email,
   password,
 ) {
+
   const cleanEmail =
-    email.trim().toLowerCase()
+    email
+      .trim()
+      .toLowerCase()
+
 
   try {
+
+    // ==================================================
+    // 1. Firebase Authentication
+    // ==================================================
+
     const credential =
       await signInWithEmailAndPassword(
         auth,
@@ -364,67 +530,124 @@ export async function loginUser(
         password,
       )
 
+
+    // ==================================================
+    // 2. Load Firestore profile
+    // ==================================================
+
     const profile =
       await loadUserProfile(
         credential.user,
       )
 
+
+    // ==================================================
+    // 3. Update local authentication state
+    // ==================================================
+
     currentUserProfile =
       profile
 
+
     notifyAuthSubscribers()
 
+
     return {
-      success: true,
-      user: profile,
+      success:
+        true,
+
+      user:
+        profile,
     }
+
   } catch (error) {
+
     console.error(
       'Firebase login error:',
       error,
     )
 
-    switch (error.code) {
+
+    switch (
+      error.code
+    ) {
+
       case 'auth/invalid-credential':
+
       case 'auth/user-not-found':
+
       case 'auth/wrong-password':
+
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Invalid email or password.',
         }
 
+
       case 'auth/invalid-email':
+
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Please enter a valid email address.',
         }
 
+
       case 'auth/user-disabled':
+
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'This account has been disabled.',
         }
 
+
       case 'auth/too-many-requests':
+
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Too many login attempts. Please try again later.',
         }
 
+
       case 'auth/network-request-failed':
+
         return {
-          success: false,
+          success:
+            false,
+
           message:
             'Network error. Please try again.',
         }
 
-      default:
+
+      case 'permission-denied':
+
         return {
-          success: false,
+          success:
+            false,
+
+          message:
+            'Unable to access the user profile.',
+        }
+
+
+      default:
+
+        return {
+          success:
+            false,
+
           message:
             'Unable to log in. Please try again.',
         }
@@ -434,30 +657,47 @@ export async function loginUser(
 
 
 // ======================================================
-// Logout
+// Logout user
 // ======================================================
 
 export async function logoutUser() {
-  await signOut(auth)
 
-  currentUserProfile = null
+  await signOut(
+    auth,
+  )
+
+
+  currentUserProfile =
+    null
+
 
   notifyAuthSubscribers()
 }
 
 
 // ======================================================
-// Authentication helpers
+// Authentication helper
 // ======================================================
 
 export function isAuthenticated() {
-  return currentUserProfile !== null
+
+  return (
+    currentUserProfile !==
+    null
+  )
 }
 
 
+// ======================================================
+// Administrator helper
+// ======================================================
+
 export function isAdmin() {
+
   return (
-    currentUserProfile !== null &&
+    currentUserProfile !==
+      null &&
+
     currentUserProfile.role ===
       'admin'
   )
@@ -465,13 +705,21 @@ export function isAdmin() {
 
 
 // ======================================================
-// Load all user profiles
+// Load all registered users
+// ======================================================
 //
-// Used by the administrator dashboard.
-// Firestore security rules will later restrict this.
+// This function is used by AdminView.vue.
+//
+// Once the final Firestore Security Rules are enabled,
+// only authenticated users with role "admin" will have
+// permission to list the users collection.
+//
+// A normal account calling this function will receive
+// a Firestore permission-denied error.
 // ======================================================
 
 export async function getUsers() {
+
   const snapshot =
     await getDocs(
       collection(
@@ -480,8 +728,10 @@ export async function getUsers() {
       ),
     )
 
+
   return snapshot.docs.map(
     (userDocument) => ({
+
       id:
         userDocument.id,
 
