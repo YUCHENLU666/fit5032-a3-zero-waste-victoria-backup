@@ -23,12 +23,11 @@ const currentUser = ref(null)
 // Listen for Firebase authentication changes
 // ======================================================
 //
-// Unlike the previous LocalStorage implementation,
 // Firebase authentication state can change asynchronously.
 //
 // The navbar therefore subscribes directly to the
-// authentication service instead of checking LocalStorage
-// whenever the route changes.
+// authentication service and updates automatically when
+// the user signs in or signs out.
 // ======================================================
 
 const unsubscribe =
@@ -76,6 +75,7 @@ const handleLogout =
       border-bottom
       sticky-top
     "
+    aria-label="Main navigation"
   >
     <div class="container">
 
@@ -116,6 +116,10 @@ const handleLogout =
           "
         >
 
+          <!-- ================================================= -->
+          <!-- Public navigation -->
+          <!-- ================================================= -->
+
           <!-- Home -->
           <li class="nav-item">
             <RouterLink
@@ -138,13 +142,14 @@ const handleLogout =
           </li>
 
 
-          <!-- =============================== -->
-          <!-- Guest -->
-          <!-- =============================== -->
+          <!-- ================================================= -->
+          <!-- Guest navigation -->
+          <!-- ================================================= -->
 
           <template
             v-if="!currentUser"
           >
+            <!-- Login -->
             <li class="nav-item">
               <RouterLink
                 class="nav-link"
@@ -154,6 +159,8 @@ const handleLogout =
               </RouterLink>
             </li>
 
+
+            <!-- Register -->
             <li
               class="nav-item ms-lg-2"
             >
@@ -173,11 +180,22 @@ const handleLogout =
           </template>
 
 
-          <!-- =============================== -->
-          <!-- Authenticated user -->
-          <!-- =============================== -->
+          <!-- ================================================= -->
+          <!-- Authenticated navigation -->
+          <!-- ================================================= -->
 
           <template v-else>
+
+            <!-- Email -->
+            <li class="nav-item">
+              <RouterLink
+                class="nav-link"
+                to="/email"
+              >
+                Email
+              </RouterLink>
+            </li>
+
 
             <!-- Admin only -->
             <li
@@ -215,6 +233,7 @@ const handleLogout =
                   text-success
                   fw-semibold
                 "
+                aria-label="Current signed-in user"
               >
                 Hi,
                 {{ currentUser.username }}

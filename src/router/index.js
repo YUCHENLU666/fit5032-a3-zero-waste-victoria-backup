@@ -11,6 +11,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import AccountView from '../views/AccountView.vue'
 import AdminView from '../views/AdminView.vue'
+import EmailView from '../views/EmailView.vue'
 
 import {
   getCurrentUser,
@@ -63,7 +64,7 @@ const router = createRouter({
 
 
     // =====================================================
-    // Protected user page
+    // Protected user account page
     //
     // Only authenticated Firebase users
     // can access this route.
@@ -72,6 +73,26 @@ const router = createRouter({
       path: '/account',
       name: 'account',
       component: AccountView,
+
+      meta: {
+        requiresAuth: true,
+      },
+    },
+
+
+    // =====================================================
+    // Protected Email page
+    //
+    // Only authenticated Firebase users
+    // can access the email composition page.
+    //
+    // The backend Cloud Function also checks
+    // request.auth, providing server-side protection.
+    // =====================================================
+    {
+      path: '/email',
+      name: 'email',
+      component: EmailView,
 
       meta: {
         requiresAuth: true,
@@ -131,9 +152,10 @@ router.beforeEach(
     // Wait for Firebase Authentication to finish
     // restoring the current session.
     //
-    // Without this step, refreshing /account or /admin
-    // could incorrectly redirect the user to /login
-    // before Firebase has finished loading the session.
+    // Without this step, refreshing protected routes
+    // such as /account, /email, or /admin could
+    // incorrectly redirect the user to /login before
+    // Firebase has finished loading the session.
     // --------------------------------------------------
     await waitForAuthReady()
 
@@ -156,6 +178,11 @@ router.beforeEach(
     //
     // If a route requires authentication and no user
     // is currently logged in, redirect to Login.
+    //
+    // This protects:
+    // - /account
+    // - /email
+    // - /admin
     //
     // The original destination is stored so that after
     // successful login the user can return to the page
@@ -218,7 +245,7 @@ router.beforeEach(
       // to the Admin Dashboard.
       if (
         currentUser.role ===
-        'admin'
+          'admin'
       ) {
         return {
           name: 'admin',
