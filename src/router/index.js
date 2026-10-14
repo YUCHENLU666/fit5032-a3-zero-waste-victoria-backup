@@ -6,6 +6,7 @@ import {
 import HomeView from '../views/HomeView.vue'
 import RecyclingFinderView from '../views/RecyclingFinderView.vue'
 import SearchResultsView from '../views/SearchResultsView.vue'
+import DataExplorerView from '../views/DataExplorerView.vue'
 
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
@@ -44,6 +45,23 @@ const router = createRouter({
       path: '/results',
       name: 'results',
       component: SearchResultsView,
+    },
+
+    // =====================================================
+    // Interactive Data Explorer
+    //
+    // This public page demonstrates:
+    // - Two independent interactive tables
+    // - Global search
+    // - Individual column filters
+    // - Ascending / descending sorting
+    // - Pagination with 10 rows per page
+    // - Accessible table controls
+    // =====================================================
+    {
+      path: '/data-explorer',
+      name: 'data-explorer',
+      component: DataExplorerView,
     },
 
 

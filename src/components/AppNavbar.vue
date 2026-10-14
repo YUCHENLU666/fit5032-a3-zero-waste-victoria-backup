@@ -142,6 +142,17 @@ const handleLogout =
           </li>
 
 
+          <!-- Interactive Data Explorer -->
+          <li class="nav-item">
+            <RouterLink
+              class="nav-link"
+              to="/data-explorer"
+            >
+              Data Explorer
+            </RouterLink>
+          </li>
+
+
           <!-- ================================================= -->
           <!-- Guest navigation -->
           <!-- ================================================= -->
