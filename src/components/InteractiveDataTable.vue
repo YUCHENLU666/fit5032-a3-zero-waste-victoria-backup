@@ -6,6 +6,11 @@ import {
   watch,
 } from 'vue'
 
+import {
+  exportTableToCsv,
+  exportTableToPdf,
+} from '../services/exportService.js'
+
 
 // ======================================================
 // Props
@@ -45,7 +50,8 @@ const props = defineProps({
 
   title: {
     type: String,
-    default: 'Interactive Data Table',
+    default:
+      'Interactive Data Table',
   },
 
   pageSize: {
@@ -59,14 +65,73 @@ const props = defineProps({
 // Search and sorting state
 // ======================================================
 
-const globalSearch = ref('')
+const globalSearch =
+  ref('')
 
-const columnFilters = reactive({})
+const columnFilters =
+  reactive({})
 
-const sortKey = ref('')
-const sortDirection = ref('asc')
+const sortKey =
+  ref('')
 
-const currentPage = ref(1)
+const sortDirection =
+  ref('asc')
+
+const currentPage =
+  ref(1)
+
+
+// ======================================================
+// Export state
+// ======================================================
+
+const exportMessage =
+  ref('')
+
+const exportError =
+  ref('')
+
+
+// ======================================================
+// Accessible IDs
+// ======================================================
+//
+// Convert the table title into a safe HTML ID.
+//
+// Example:
+// "Recycling Locations"
+// becomes:
+// "recycling-locations"
+// ======================================================
+
+const safeTableId =
+  computed(() =>
+    props.title
+      .trim()
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9]+/g,
+        '-',
+      )
+      .replace(
+        /^-+|-+$/g,
+        '',
+      ),
+  )
+
+
+const globalSearchId =
+  computed(
+    () =>
+      `${safeTableId.value}-global-search`,
+  )
+
+
+function getColumnFilterId(
+  column,
+) {
+  return `${safeTableId.value}-${column.key}-filter`
+}
 
 
 // ======================================================
@@ -81,14 +146,18 @@ function getCellValue(
     typeof column.getValue ===
     'function'
   ) {
-    return column.getValue(row)
+    return column.getValue(
+      row,
+    )
   }
 
   return row[column.key]
 }
 
 
-function normaliseValue(value) {
+function normaliseValue(
+  value,
+) {
   if (
     value === null ||
     value === undefined
@@ -96,7 +165,9 @@ function normaliseValue(value) {
     return ''
   }
 
-  if (Array.isArray(value)) {
+  if (
+    Array.isArray(value)
+  ) {
     return value
       .join(' ')
       .toLowerCase()
@@ -135,7 +206,9 @@ function formatValue(
     return '—'
   }
 
-  if (Array.isArray(value)) {
+  if (
+    Array.isArray(value)
+  ) {
     return value.join(', ')
   }
 
@@ -147,23 +220,74 @@ function formatValue(
 // Global + individual-column filtering
 // ======================================================
 
-const filteredRows = computed(() => {
-  const globalTerm =
-    globalSearch.value
-      .trim()
-      .toLowerCase()
+const filteredRows =
+  computed(() => {
+    const globalTerm =
+      globalSearch.value
+        .trim()
+        .toLowerCase()
 
-  return props.rows.filter(
-    (row) => {
+    return props.rows.filter(
+      (row) => {
 
-      // ----------------------------------------------
-      // Global search
-      // ----------------------------------------------
+        // ----------------------------------------------
+        // Global search
+        // ----------------------------------------------
 
-      if (globalTerm) {
-        const matchesGlobal =
-          props.columns.some(
+        if (globalTerm) {
+          const matchesGlobal =
+            props.columns.some(
+              (column) => {
+                const value =
+                  getCellValue(
+                    row,
+                    column,
+                  )
+
+                return normaliseValue(
+                  value,
+                ).includes(
+                  globalTerm,
+                )
+              },
+            )
+
+          if (
+            !matchesGlobal
+          ) {
+            return false
+          }
+        }
+
+
+        // ----------------------------------------------
+        // Individual column search
+        // ----------------------------------------------
+
+        const matchesColumns =
+          props.columns.every(
             (column) => {
+
+              if (
+                column.searchable ===
+                false
+              ) {
+                return true
+              }
+
+              const filter =
+                (
+                  columnFilters[
+                    column.key
+                  ] || ''
+                )
+                  .trim()
+                  .toLowerCase()
+
+              if (!filter) {
+                return true
+              }
+
               const value =
                 getCellValue(
                   row,
@@ -173,159 +297,126 @@ const filteredRows = computed(() => {
               return normaliseValue(
                 value,
               ).includes(
-                globalTerm,
+                filter,
               )
             },
           )
 
-        if (!matchesGlobal) {
-          return false
-        }
-      }
-
-
-      // ----------------------------------------------
-      // Individual column search
-      // ----------------------------------------------
-
-      const matchesColumns =
-        props.columns.every(
-          (column) => {
-
-            if (
-              column.searchable ===
-              false
-            ) {
-              return true
-            }
-
-            const filter =
-              (
-                columnFilters[
-                  column.key
-                ] || ''
-              )
-                .trim()
-                .toLowerCase()
-
-            if (!filter) {
-              return true
-            }
-
-            const value =
-              getCellValue(
-                row,
-                column,
-              )
-
-            return normaliseValue(
-              value,
-            ).includes(filter)
-          },
-        )
-
-      return matchesColumns
-    },
-  )
-})
+        return matchesColumns
+      },
+    )
+  })
 
 
 // ======================================================
 // Sorting
 // ======================================================
 
-const sortedRows = computed(() => {
-  const result = [
-    ...filteredRows.value,
-  ]
+const sortedRows =
+  computed(() => {
+    const result = [
+      ...filteredRows.value,
+    ]
 
-  if (!sortKey.value) {
-    return result
-  }
+    if (
+      !sortKey.value
+    ) {
+      return result
+    }
 
-  const column =
-    props.columns.find(
-      (item) =>
-        item.key ===
-        sortKey.value,
-    )
+    const column =
+      props.columns.find(
+        (item) =>
+          item.key ===
+          sortKey.value,
+      )
 
-  if (!column) {
-    return result
-  }
+    if (!column) {
+      return result
+    }
 
-  result.sort(
-    (rowA, rowB) => {
-      const rawA =
-        getCellValue(
-          rowA,
-          column,
-        )
+    result.sort(
+      (
+        rowA,
+        rowB,
+      ) => {
+        const rawA =
+          getCellValue(
+            rowA,
+            column,
+          )
 
-      const rawB =
-        getCellValue(
-          rowB,
-          column,
-        )
+        const rawB =
+          getCellValue(
+            rowB,
+            column,
+          )
 
 
-      // ----------------------------------------------
-      // Numeric sorting
-      // ----------------------------------------------
+        // ----------------------------------------------
+        // Numeric sorting
+        // ----------------------------------------------
 
-      if (
-        typeof rawA ===
-          'number' &&
-        typeof rawB ===
-          'number'
-      ) {
+        if (
+          typeof rawA ===
+            'number' &&
+          typeof rawB ===
+            'number'
+        ) {
+          return sortDirection.value ===
+            'asc'
+            ? rawA - rawB
+            : rawB - rawA
+        }
+
+
+        // ----------------------------------------------
+        // String / array sorting
+        // ----------------------------------------------
+
+        const valueA =
+          Array.isArray(rawA)
+            ? rawA.join(', ')
+            : String(
+                rawA ?? '',
+              )
+
+        const valueB =
+          Array.isArray(rawB)
+            ? rawB.join(', ')
+            : String(
+                rawB ?? '',
+              )
+
+        const compareResult =
+          valueA.localeCompare(
+            valueB,
+            undefined,
+            {
+              numeric: true,
+              sensitivity:
+                'base',
+            },
+          )
+
         return sortDirection.value ===
           'asc'
-          ? rawA - rawB
-          : rawB - rawA
-      }
+          ? compareResult
+          : -compareResult
+      },
+    )
+
+    return result
+  })
 
 
-      // ----------------------------------------------
-      // String / array sorting
-      // ----------------------------------------------
+// ======================================================
+// Sorting controls
+// ======================================================
 
-      const valueA =
-        Array.isArray(rawA)
-          ? rawA.join(', ')
-          : String(
-              rawA ?? '',
-            )
-
-      const valueB =
-        Array.isArray(rawB)
-          ? rawB.join(', ')
-          : String(
-              rawB ?? '',
-            )
-
-      const result =
-        valueA.localeCompare(
-          valueB,
-          undefined,
-          {
-            numeric: true,
-            sensitivity: 'base',
-          },
-        )
-
-      return sortDirection.value ===
-        'asc'
-        ? result
-        : -result
-    },
-  )
-
-  return result
-})
-
-
-function sortBy(column) {
+function sortBy(
+  column,
+) {
   if (
     column.sortable ===
     false
@@ -354,7 +445,9 @@ function sortBy(column) {
 }
 
 
-function getSortIcon(column) {
+function getSortIcon(
+  column,
+) {
   if (
     sortKey.value !==
     column.key
@@ -369,7 +462,9 @@ function getSortIcon(column) {
 }
 
 
-function getAriaSort(column) {
+function getAriaSort(
+  column,
+) {
   if (
     column.sortable ===
     false
@@ -395,26 +490,28 @@ function getAriaSort(column) {
 // Pagination
 // ======================================================
 
-const totalRows = computed(
-  () =>
-    sortedRows.value.length,
-)
+const totalRows =
+  computed(
+    () =>
+      sortedRows.value.length,
+  )
 
 
-const totalPages = computed(
-  () =>
+const totalPages =
+  computed(() =>
     Math.max(
       1,
+
       Math.ceil(
         totalRows.value /
           props.pageSize,
       ),
     ),
-)
+  )
 
 
-const paginatedRows = computed(
-  () => {
+const paginatedRows =
+  computed(() => {
     const start =
       (
         currentPage.value -
@@ -430,30 +527,31 @@ const paginatedRows = computed(
       start,
       end,
     )
-  },
-)
+  })
 
 
-const pageNumbers = computed(
-  () =>
+const pageNumbers =
+  computed(() =>
     Array.from(
       {
         length:
           totalPages.value,
       },
+
       (
         _,
         index,
       ) =>
         index + 1,
     ),
-)
+  )
 
 
 const firstVisibleRow =
   computed(() => {
     if (
-      totalRows.value === 0
+      totalRows.value ===
+      0
     ) {
       return 0
     }
@@ -472,7 +570,8 @@ const firstVisibleRow =
 const lastVisibleRow =
   computed(() => {
     if (
-      totalRows.value === 0
+      totalRows.value ===
+      0
     ) {
       return 0
     }
@@ -480,12 +579,15 @@ const lastVisibleRow =
     return Math.min(
       currentPage.value *
         props.pageSize,
+
       totalRows.value,
     )
   })
 
 
-function goToPage(page) {
+function goToPage(
+  page,
+) {
   if (
     page < 1 ||
     page >
@@ -494,21 +596,147 @@ function goToPage(page) {
     return
   }
 
-  currentPage.value = page
+  currentPage.value =
+    page
 }
 
 
 function previousPage() {
   goToPage(
-    currentPage.value - 1,
+    currentPage.value -
+      1,
   )
 }
 
 
 function nextPage() {
   goToPage(
-    currentPage.value + 1,
+    currentPage.value +
+      1,
   )
+}
+
+
+// ======================================================
+// Export helpers
+// ======================================================
+//
+// Export uses sortedRows instead of paginatedRows.
+//
+// This means:
+// - Global search is respected.
+// - Column filters are respected.
+// - Current sorting is respected.
+// - All matching records are exported,
+//   not only the current 10-row page.
+// ======================================================
+
+const exportHeaders =
+  computed(() =>
+    props.columns.map(
+      (column) =>
+        column.label,
+    ),
+  )
+
+
+const exportRows =
+  computed(() =>
+    sortedRows.value.map(
+      (row) =>
+        props.columns.map(
+          (column) => {
+            const value =
+              formatValue(
+                row,
+                column,
+              )
+
+            if (
+              value === null ||
+              value ===
+                undefined
+            ) {
+              return ''
+            }
+
+            return String(
+              value,
+            )
+          },
+        ),
+    ),
+  )
+
+
+// ======================================================
+// Clear export messages
+// ======================================================
+
+function clearExportMessages() {
+  exportMessage.value =
+    ''
+
+  exportError.value =
+    ''
+}
+
+
+// ======================================================
+// CSV export
+// ======================================================
+
+function handleExportCsv() {
+  clearExportMessages()
+
+  try {
+    exportTableToCsv({
+      title:
+        props.title,
+
+      headers:
+        exportHeaders.value,
+
+      rows:
+        exportRows.value,
+    })
+
+    exportMessage.value =
+      `${totalRows.value} record(s) exported to CSV successfully.`
+  } catch (error) {
+    exportError.value =
+      error.message ||
+      'Unable to export CSV.'
+  }
+}
+
+
+// ======================================================
+// PDF export
+// ======================================================
+
+function handleExportPdf() {
+  clearExportMessages()
+
+  try {
+    exportTableToPdf({
+      title:
+        props.title,
+
+      headers:
+        exportHeaders.value,
+
+      rows:
+        exportRows.value,
+    })
+
+    exportMessage.value =
+      `${totalRows.value} record(s) exported to PDF successfully.`
+  } catch (error) {
+    exportError.value =
+      error.message ||
+      'Unable to export PDF.'
+  }
 }
 
 
@@ -521,13 +749,21 @@ function clearFilters() {
 
   Object.keys(
     columnFilters,
-  ).forEach((key) => {
-    columnFilters[key] = ''
-  })
+  ).forEach(
+    (key) => {
+      columnFilters[key] =
+        ''
+    },
+  )
 
   sortKey.value = ''
-  sortDirection.value = 'asc'
+
+  sortDirection.value =
+    'asc'
+
   currentPage.value = 1
+
+  clearExportMessages()
 }
 
 
@@ -539,6 +775,7 @@ watch(
   globalSearch,
   () => {
     currentPage.value = 1
+    clearExportMessages()
   },
 )
 
@@ -547,6 +784,7 @@ watch(
   columnFilters,
   () => {
     currentPage.value = 1
+    clearExportMessages()
   },
   {
     deep: true,
@@ -558,6 +796,7 @@ watch(
   () => props.rows,
   () => {
     currentPage.value = 1
+    clearExportMessages()
   },
   {
     deep: true,
@@ -571,6 +810,7 @@ watch(
     class="interactive-table"
     :aria-label="title"
   >
+
     <!-- ================================================= -->
     <!-- Table controls -->
     <!-- ================================================= -->
@@ -584,22 +824,28 @@ watch(
         justify-content-between
         align-items-lg-end
         gap-3
-        mb-4
+        mb-3
       "
     >
+
+      <!-- Global search -->
       <div class="flex-grow-1">
+
         <label
           :for="
-            `${title}-global-search`
+            globalSearchId
           "
-          class="form-label fw-semibold"
+          class="
+            form-label
+            fw-semibold
+          "
         >
           Search all columns
         </label>
 
         <input
           :id="
-            `${title}-global-search`
+            globalSearchId
           "
           v-model="
             globalSearch
@@ -609,14 +855,65 @@ watch(
           placeholder="Search this table..."
         />
 
-        <div class="form-text">
+        <div
+          class="form-text"
+        >
           Search across all
           displayed columns.
         </div>
+
       </div>
 
 
-      <div>
+      <!-- Control buttons -->
+      <div
+        class="
+          table-action-buttons
+          d-flex
+          flex-wrap
+          gap-2
+        "
+      >
+
+        <!-- Export CSV -->
+        <button
+          type="button"
+          class="
+            btn
+            btn-success
+            text-nowrap
+          "
+          :disabled="
+            totalRows === 0
+          "
+          @click="
+            handleExportCsv
+          "
+        >
+          ↓ Export CSV
+        </button>
+
+
+        <!-- Export PDF -->
+        <button
+          type="button"
+          class="
+            btn
+            btn-outline-success
+            text-nowrap
+          "
+          :disabled="
+            totalRows === 0
+          "
+          @click="
+            handleExportPdf
+          "
+        >
+          ↓ Export PDF
+        </button>
+
+
+        <!-- Clear -->
         <button
           type="button"
           class="
@@ -624,10 +921,57 @@ watch(
             btn-outline-secondary
             text-nowrap
           "
-          @click="clearFilters"
+          @click="
+            clearFilters
+          "
         >
           Clear Filters
         </button>
+
+      </div>
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- Export feedback -->
+    <!-- ================================================= -->
+
+    <div
+      class="
+        export-feedback
+        mb-3
+      "
+    >
+      <div
+        v-if="
+          exportMessage
+        "
+        class="
+          alert
+          alert-success
+          py-2
+          mb-2
+        "
+        role="status"
+        aria-live="polite"
+      >
+        {{ exportMessage }}
+      </div>
+
+      <div
+        v-if="
+          exportError
+        "
+        class="
+          alert
+          alert-danger
+          py-2
+          mb-2
+        "
+        role="alert"
+        aria-live="assertive"
+      >
+        {{ exportError }}
       </div>
     </div>
 
@@ -648,10 +992,13 @@ watch(
       "
       aria-live="polite"
     >
-      <p class="mb-0 fw-semibold">
-        {{
-          totalRows
-        }}
+      <p
+        class="
+          mb-0
+          fw-semibold
+        "
+      >
+        {{ totalRows }}
         record(s) found
       </p>
 
@@ -701,6 +1048,9 @@ watch(
           Sortable column headings
           can be activated using
           keyboard or mouse.
+          Filtered and sorted
+          results can be exported
+          to CSV or PDF.
         </caption>
 
 
@@ -800,7 +1150,9 @@ watch(
                   false
                 "
                 :for="
-                  `${title}-${column.key}-filter`
+                  getColumnFilterId(
+                    column,
+                  )
                 "
                 class="
                   visually-hidden
@@ -818,7 +1170,9 @@ watch(
                   false
                 "
                 :id="
-                  `${title}-${column.key}-filter`
+                  getColumnFilterId(
+                    column,
+                  )
                 "
                 v-model="
                   columnFilters[
@@ -859,7 +1213,9 @@ watch(
               row in
               paginatedRows
             "
-            :key="row.id"
+            :key="
+              row.id
+            "
           >
             <td
               v-for="
@@ -999,6 +1355,7 @@ watch(
             flex-wrap
           "
         >
+
           <!-- Previous -->
           <li
             class="page-item"
@@ -1029,7 +1386,9 @@ watch(
               page in
               pageNumbers
             "
-            :key="page"
+            :key="
+              page
+            "
             class="page-item"
             :class="{
               active:
@@ -1084,9 +1443,11 @@ watch(
               Next
             </button>
           </li>
+
         </ul>
       </nav>
     </div>
+
   </section>
 </template>
 
@@ -1096,8 +1457,28 @@ watch(
   width: 100%;
 }
 
+
+/* ===================================================== */
+/* Controls */
+/* ===================================================== */
+
+.table-action-buttons {
+  justify-content: flex-end;
+}
+
+.table-action-buttons
+.btn {
+  min-width: 125px;
+}
+
+
+/* ===================================================== */
+/* Table */
+/* ===================================================== */
+
 .table-responsive {
-  background-color: #ffffff;
+  background-color:
+    #ffffff;
 }
 
 table {
@@ -1105,58 +1486,111 @@ table {
 }
 
 thead th {
-  vertical-align: middle;
-  white-space: nowrap;
+  vertical-align:
+    middle;
+
+  white-space:
+    nowrap;
 }
 
+
+/* ===================================================== */
+/* Sorting */
+/* ===================================================== */
+
 .sort-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  display:
+    inline-flex;
 
-  width: 100%;
+  align-items:
+    center;
 
-  padding: 0;
+  justify-content:
+    space-between;
 
-  color: inherit;
-  font-weight: 700;
-  text-align: left;
+  gap:
+    0.5rem;
 
-  background: transparent;
-  border: 0;
+  width:
+    100%;
+
+  padding:
+    0;
+
+  color:
+    inherit;
+
+  font-weight:
+    700;
+
+  text-align:
+    left;
+
+  background:
+    transparent;
+
+  border:
+    0;
 }
 
 .sort-button:hover {
-  color: var(--bs-success);
+  color:
+    var(--bs-success);
 }
 
 .sort-button:focus-visible {
-  outline: 3px solid
-    rgba(25, 135, 84, 0.35);
+  outline:
+    3px solid
+    rgba(
+      25,
+      135,
+      84,
+      0.35
+    );
 
-  outline-offset: 4px;
+  outline-offset:
+    4px;
 
-  border-radius: 4px;
+  border-radius:
+    4px;
 }
 
 .sort-icon {
-  min-width: 1rem;
+  min-width:
+    1rem;
 
-  color: var(--bs-success);
-  font-weight: 700;
+  color:
+    var(--bs-success);
+
+  font-weight:
+    700;
 }
 
-.column-filter-row th {
-  padding-top: 0.5rem;
-  padding-bottom: 0.75rem;
 
-  background-color: #f8f9fa;
+/* ===================================================== */
+/* Column filters */
+/* ===================================================== */
+
+.column-filter-row th {
+  padding-top:
+    0.5rem;
+
+  padding-bottom:
+    0.75rem;
+
+  background-color:
+    #f8f9fa;
 }
 
 .column-filter-row input {
-  min-width: 120px;
+  min-width:
+    120px;
 }
+
+
+/* ===================================================== */
+/* Form controls */
+/* ===================================================== */
 
 .form-control:focus {
   border-color:
@@ -1164,8 +1598,33 @@ thead th {
 
   box-shadow:
     0 0 0 0.2rem
-    rgba(25, 135, 84, 0.15);
+    rgba(
+      25,
+      135,
+      84,
+      0.15
+    );
 }
+
+
+/* ===================================================== */
+/* Export feedback */
+/* ===================================================== */
+
+.export-feedback {
+  min-height:
+    0;
+}
+
+.alert {
+  border-radius:
+    10px;
+}
+
+
+/* ===================================================== */
+/* Pagination */
+/* ===================================================== */
 
 .page-link {
   color:
@@ -1177,12 +1636,18 @@ thead th {
     var(--bs-success);
 
   background-color:
-    rgba(25, 135, 84, 0.08);
+    rgba(
+      25,
+      135,
+      84,
+      0.08
+    );
 }
 
 .page-item.active
 .page-link {
-  color: #ffffff;
+  color:
+    #ffffff;
 
   background-color:
     var(--bs-success);
@@ -1194,25 +1659,67 @@ thead th {
 .page-link:focus {
   box-shadow:
     0 0 0 0.2rem
-    rgba(25, 135, 84, 0.15);
+    rgba(
+      25,
+      135,
+      84,
+      0.15
+    );
 }
 
 .page-link:disabled {
-  color: #6c757d;
+  color:
+    #6c757d;
 
-  background-color: #ffffff;
+  background-color:
+    #ffffff;
 }
+
+
+/* ===================================================== */
+/* Empty state */
+/* ===================================================== */
 
 .empty-state {
-  max-width: 420px;
-  margin: 0 auto;
+  max-width:
+    420px;
+
+  margin:
+    0 auto;
 }
+
+
+/* ===================================================== */
+/* Responsive */
+/* ===================================================== */
+
+@media (
+  max-width: 991px
+) {
+  .table-action-buttons {
+    justify-content:
+      flex-start;
+  }
+}
+
 
 @media (
   max-width: 768px
 ) {
   .table-controls {
-    align-items: stretch;
+    align-items:
+      stretch;
+  }
+
+  .table-action-buttons {
+    width:
+      100%;
+  }
+
+  .table-action-buttons
+  .btn {
+    flex:
+      1 1 140px;
   }
 }
 </style>
