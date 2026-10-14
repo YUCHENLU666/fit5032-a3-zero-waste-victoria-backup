@@ -50,7 +50,7 @@ const filteredLocations = computed(() => {
 </script>
 
 <template>
-  <div>
+  <main>
     <!-- ================= HEADER ================= -->
     <section class="bg-light py-5">
       <div class="container py-lg-4">
@@ -108,7 +108,7 @@ const filteredLocations = computed(() => {
         </div>
       </div>
     </section>
-  </div>
+  </main>
 </template>
 
 <style scoped>

@@ -3,7 +3,7 @@ import { RouterLink } from 'vue-router'
 </script>
 
 <template>
-  <div>
+  <main>
     <!-- ================= HERO SECTION ================= -->
     <section class="py-5 bg-light">
       <div class="container py-lg-5">
@@ -185,7 +185,7 @@ import { RouterLink } from 'vue-router'
         </div>
       </div>
     </section>
-  </div>
+  </main>
 </template>
 
 <style scoped>

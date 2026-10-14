@@ -1,0 +1,140 @@
+/* ===================================================== */
+/* Global accessibility styles */
+/* ===================================================== */
+
+
+/* ===================================================== */
+/* Skip to main content */
+/* ===================================================== */
+
+.skip-link {
+  position: fixed;
+
+  top: 0.75rem;
+  left: 0.75rem;
+
+  z-index: 9999;
+
+  padding:
+    0.75rem 1rem;
+
+  color: #ffffff;
+
+  font-weight: 700;
+  text-decoration: none;
+
+  background-color:
+    #0b5d1e;
+
+  border-radius:
+    0.5rem;
+
+  box-shadow:
+    0 0.25rem 0.75rem
+    rgba(
+      0,
+      0,
+      0,
+      0.25
+    );
+
+  transform:
+    translateY(-200%);
+
+  transition:
+    transform 0.15s ease;
+}
+
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform:
+    translateY(0);
+
+  outline:
+    3px solid #ffffff;
+
+  outline-offset:
+    3px;
+}
+
+
+/* ===================================================== */
+/* Global keyboard focus */
+/* ===================================================== */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline:
+    3px solid #0b5d1e;
+
+  outline-offset:
+    3px;
+}
+
+
+/* ===================================================== */
+/* Route heading focus */
+/* ===================================================== */
+
+/*
+  Page headings receive programmatic focus when a
+  Vue Router navigation occurs.
+
+  This focus is primarily for assistive technology,
+  so it does not need to look like an interactive control.
+*/
+
+h1[tabindex='-1']:focus {
+  outline: none;
+}
+
+
+/* ===================================================== */
+/* Improve links that rely on colour */
+/* ===================================================== */
+
+main a:not(.btn) {
+  text-decoration-thickness:
+    0.08em;
+
+  text-underline-offset:
+    0.15em;
+}
+
+
+/* ===================================================== */
+/* Reduced motion */
+/* ===================================================== */
+
+/*
+  WCAG-friendly behaviour for users who request
+  reduced animation through their operating system.
+*/
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior:
+      auto !important;
+
+    animation-duration:
+      0.01ms !important;
+
+    animation-iteration-count:
+      1 !important;
+
+    transition-duration:
+      0.01ms !important;
+
+    transition-delay:
+      0ms !important;
+  }
+}

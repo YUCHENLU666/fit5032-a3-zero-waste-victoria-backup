@@ -1,22 +1,74 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import {
+  nextTick,
+  ref,
+} from 'vue'
 
-const router = useRouter()
+import {
+  useRouter,
+} from 'vue-router'
 
-const item = ref('')
-const postcode = ref('')
 
-const itemError = ref('')
-const postcodeError = ref('')
+const router =
+  useRouter()
 
-// ================= RECENT SEARCHES =================
-// Load saved searches from localStorage
-const recentSearches = ref(
-  JSON.parse(
-    localStorage.getItem('zwvRecentSearches') || '[]'
+
+// ======================================================
+// Form fields
+// ======================================================
+
+const item =
+  ref('')
+
+const postcode =
+  ref('')
+
+
+// ======================================================
+// Input references
+//
+// Used to move keyboard focus to the first invalid field
+// when form validation fails.
+// ======================================================
+
+const itemInput =
+  ref(null)
+
+const postcodeInput =
+  ref(null)
+
+
+// ======================================================
+// Validation state
+// ======================================================
+
+const itemError =
+  ref('')
+
+const postcodeError =
+  ref('')
+
+
+// ======================================================
+// Recent searches
+//
+// Search history is stored locally in the browser.
+// Only the five most recent searches are kept.
+// ======================================================
+
+const recentSearches =
+  ref(
+    JSON.parse(
+      localStorage.getItem(
+        'zwvRecentSearches',
+      ) || '[]',
+    ),
   )
-)
+
+
+// ======================================================
+// Supported recycling categories
+// ======================================================
 
 const categories = [
   'Batteries',
@@ -26,292 +78,713 @@ const categories = [
   'Plastics',
 ]
 
-// ================= MATERIAL INPUT RULE =================
+
+// ======================================================
+// Material input rule
+//
 // Rules:
 // - Must start with a letter or number
-// - Only letters, numbers, spaces and hyphens are allowed
-// - Maximum length is 50 characters
+// - Only letters, numbers, spaces and hyphens
+// - Maximum 50 characters
+// ======================================================
+
 const itemPattern =
   /^[A-Za-z0-9][A-Za-z0-9 -]{0,49}$/
 
 
-// ================= QUICK CATEGORY =================
-const selectCategory = (category) => {
-  item.value = category
-  itemError.value = ''
-}
+// ======================================================
+// Quick category selection
+// ======================================================
+
+const selectCategory =
+  (category) => {
+    item.value =
+      category
+
+    itemError.value =
+      ''
+  }
 
 
-// ================= USE RECENT SEARCH =================
-const useRecentSearch = (search) => {
-  item.value = search.item
-  postcode.value = search.postcode
+// ======================================================
+// Use recent search
+// ======================================================
 
+const useRecentSearch =
+  (search) => {
+    item.value =
+      search.item
+
+    postcode.value =
+      search.postcode
+
+    itemError.value =
+      ''
+
+    postcodeError.value =
+      ''
+  }
+
+
+// ======================================================
+// Clear recent searches
+// ======================================================
+
+const clearRecentSearches =
+  () => {
+    recentSearches.value =
+      []
+
+    localStorage.removeItem(
+      'zwvRecentSearches',
+    )
+  }
+
+
+// ======================================================
+// Clear validation errors
+// ======================================================
+
+function clearErrors() {
   itemError.value = ''
   postcodeError.value = ''
 }
 
 
-// ================= CLEAR RECENT SEARCHES =================
-const clearRecentSearches = () => {
-  recentSearches.value = []
+// ======================================================
+// Validate form
+// ======================================================
 
-  localStorage.removeItem(
-    'zwvRecentSearches'
-  )
-}
+function validateForm() {
+  clearErrors()
+
+  let isValid = true
 
 
-// ================= FORM SUBMISSION =================
-const handleSubmit = () => {
+  // --------------------------------------------------
+  // Material validation
+  // --------------------------------------------------
 
-  // ================= ITEM VALIDATION =================
+  const cleanItem =
+    item.value.trim()
 
-  if (!item.value) {
+  if (!cleanItem) {
     itemError.value =
       'Please enter an item or select a category.'
-  } else if (item.value.length > 50) {
+
+    isValid = false
+  } else if (
+    cleanItem.length > 50
+  ) {
     itemError.value =
       'Item must be 50 characters or fewer.'
-  } else if (!itemPattern.test(item.value)) {
+
+    isValid = false
+  } else if (
+    !itemPattern.test(
+      cleanItem,
+    )
+  ) {
     itemError.value =
       'Item contains invalid characters.'
-  } else {
-    itemError.value = ''
+
+    isValid = false
   }
 
 
-  // ================= POSTCODE VALIDATION =================
+  // --------------------------------------------------
+  // Postcode validation
+  // --------------------------------------------------
 
-  const postcodePattern = /^\d{4}$/
+  const cleanPostcode =
+    postcode.value.trim()
 
-  // Step 1: Check 4-digit format
+  const postcodePattern =
+    /^\d{4}$/
+
   if (
-    !postcode.value ||
-    !postcodePattern.test(postcode.value)
+    !cleanPostcode ||
+    !postcodePattern.test(
+      cleanPostcode,
+    )
   ) {
     postcodeError.value =
       'Please enter a valid 4-digit postcode.'
+
+    isValid = false
   } else {
     const postcodeNumber =
-      Number(postcode.value)
+      Number(
+        cleanPostcode,
+      )
 
-    // Step 2: Check current project service area
     if (
       postcodeNumber < 3000 ||
       postcodeNumber > 3999
     ) {
       postcodeError.value =
         'Please enter a postcode in the current service area (3000–3999).'
-    } else {
-      postcodeError.value = ''
+
+      isValid = false
     }
   }
 
 
-  // ================= SUCCESS =================
+  return isValid
+}
+
+
+// ======================================================
+// Focus first invalid field
+// ======================================================
+
+async function focusFirstError() {
+  await nextTick()
 
   if (
-    !itemError.value &&
-    !postcodeError.value
+    itemError.value
   ) {
-    const currentSearch = {
-      item: item.value,
-      postcode: postcode.value,
+    itemInput.value?.focus()
+    return
+  }
+
+  if (
+    postcodeError.value
+  ) {
+    postcodeInput.value?.focus()
+  }
+}
+
+
+// ======================================================
+// Form submission
+// ======================================================
+
+const handleSubmit =
+  async () => {
+
+    const isValid =
+      validateForm()
+
+
+    // --------------------------------------------------
+    // Invalid form
+    // --------------------------------------------------
+
+    if (!isValid) {
+      await focusFirstError()
+      return
     }
 
+
+    const cleanItem =
+      item.value.trim()
+
+    const cleanPostcode =
+      postcode.value.trim()
+
+
+    // --------------------------------------------------
+    // Create current search
+    // --------------------------------------------------
+
+    const currentSearch = {
+      item:
+        cleanItem,
+
+      postcode:
+        cleanPostcode,
+    }
+
+
+    // --------------------------------------------------
     // Remove duplicate searches
+    // --------------------------------------------------
+
     recentSearches.value =
       recentSearches.value.filter(
         (search) => {
           return !(
-            search.item.toLowerCase() ===
-              currentSearch.item.toLowerCase() &&
+            search.item
+              .toLowerCase() ===
+              currentSearch.item
+                .toLowerCase() &&
             search.postcode ===
               currentSearch.postcode
           )
-        }
+        },
       )
 
-    // Put the newest search first
+
+    // --------------------------------------------------
+    // Put newest search first
+    // --------------------------------------------------
+
     recentSearches.value.unshift(
-      currentSearch
+      currentSearch,
     )
 
-    // Keep only the latest 5 searches
-    recentSearches.value =
-      recentSearches.value.slice(0, 5)
 
-    // Save to localStorage
+    // --------------------------------------------------
+    // Keep only five recent searches
+    // --------------------------------------------------
+
+    recentSearches.value =
+      recentSearches.value.slice(
+        0,
+        5,
+      )
+
+
+    // --------------------------------------------------
+    // Persist recent searches
+    // --------------------------------------------------
+
     localStorage.setItem(
       'zwvRecentSearches',
+
       JSON.stringify(
-        recentSearches.value
-      )
+        recentSearches.value,
+      ),
     )
 
+
+    // --------------------------------------------------
     // Navigate to results
-    router.push({
-      path: '/results',
+    // --------------------------------------------------
+
+    await router.push({
+      path:
+        '/results',
 
       query: {
-        item: item.value,
-        postcode: postcode.value,
+        item:
+          cleanItem,
+
+        postcode:
+          cleanPostcode,
       },
     })
   }
-}
 </script>
 
 
 <template>
-  <div>
+  <main
+    aria-labelledby="recycling-finder-title"
+  >
 
-    <!-- ================= PAGE HEADER ================= -->
-    <section class="bg-light py-5">
-      <div class="container text-center py-lg-4">
+    <!-- ================================================= -->
+    <!-- Page header -->
+    <!-- ================================================= -->
 
-        <p class="text-success fw-bold text-uppercase mb-2">
+    <section
+      class="
+        bg-light
+        py-5
+      "
+    >
+      <div
+        class="
+          container
+          text-center
+          py-lg-4
+        "
+      >
+
+        <p
+          class="
+            text-success
+            fw-bold
+            text-uppercase
+            mb-2
+          "
+        >
           Recycling Finder
         </p>
 
-        <h1 class="display-5 fw-bold mb-3">
-          Find the right place for your item
+
+        <h1
+          id="recycling-finder-title"
+          class="
+            display-5
+            fw-bold
+            mb-3
+          "
+        >
+          Find the right place
+          for your item
         </h1>
 
-        <p class="lead text-secondary mx-auto finder-intro">
-          Tell us what you want to recycle and your postcode,
-          and we’ll help you find suitable recycling and reuse options.
+
+        <p
+          class="
+            lead
+            text-secondary
+            mx-auto
+            finder-intro
+          "
+        >
+          Tell us what you want
+          to recycle and your
+          postcode, and we’ll help
+          you find suitable
+          recycling and reuse
+          options.
         </p>
 
       </div>
     </section>
 
 
-    <!-- ================= FINDER ================= -->
-    <section class="py-5">
+    <!-- ================================================= -->
+    <!-- Finder -->
+    <!-- ================================================= -->
+
+    <section
+      class="py-5"
+      aria-labelledby="finder-form-title"
+    >
       <div class="container">
 
-        <div class="row justify-content-center">
+        <div
+          class="
+            row
+            justify-content-center
+          "
+        >
 
-          <div class="col-lg-8">
+          <div
+            class="col-lg-8"
+          >
 
-            <div class="card border-0 shadow-sm rounded-4">
+            <div
+              class="
+                card
+                border-0
+                shadow-sm
+                rounded-4
+              "
+            >
 
-              <div class="card-body p-4 p-md-5">
+              <div
+                class="
+                  card-body
+                  p-4
+                  p-md-5
+                "
+              >
+
+                <h2
+                  id="finder-form-title"
+                  class="
+                    h4
+                    fw-bold
+                    mb-4
+                  "
+                >
+                  Search recycling options
+                </h2>
+
 
                 <form
-                  @submit.prevent="handleSubmit"
                   novalidate
+                  @submit.prevent="
+                    handleSubmit
+                  "
                 >
 
-                  <!-- ================= MATERIAL ================= -->
-                  <div class="mb-4">
+                  <!-- =========================================== -->
+                  <!-- Material -->
+                  <!-- =========================================== -->
+
+                  <div
+                    class="mb-4"
+                  >
 
                     <label
                       for="item"
-                      class="form-label fw-semibold"
+                      class="
+                        form-label
+                        fw-semibold
+                      "
                     >
-                      What would you like to recycle?
-                      <span class="text-danger">*</span>
+                      What would you
+                      like to recycle?
+
+                      <span
+                        class="
+                          text-danger
+                        "
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+
+                      <span
+                        class="
+                          visually-hidden
+                        "
+                      >
+                        required
+                      </span>
                     </label>
+
 
                     <input
                       id="item"
-                      v-model.trim="item"
+                      ref="itemInput"
+                      v-model.trim="
+                        item
+                      "
                       type="text"
                       maxlength="50"
-                      class="form-control form-control-lg"
+                      class="
+                        form-control
+                        form-control-lg
+                      "
                       :class="{
-                        'is-invalid': itemError
+                        'is-invalid':
+                          itemError,
                       }"
                       placeholder="e.g. Batteries"
+                      autocomplete="off"
+                      required
+                      aria-required="true"
+                      :aria-invalid="
+                        itemError
+                          ? 'true'
+                          : 'false'
+                      "
+                      :aria-describedby="
+                        itemError
+                          ? 'item-help item-error'
+                          : 'item-help'
+                      "
                     />
 
+
                     <div
-                      v-if="itemError"
-                      class="invalid-feedback"
+                      v-if="
+                        itemError
+                      "
+                      id="item-error"
+                      class="
+                        invalid-feedback
+                      "
+                      role="alert"
                     >
-                      {{ itemError }}
+                      {{
+                        itemError
+                      }}
                     </div>
 
-                    <div class="form-text">
-                      Enter an item or choose a category below.
-                      Maximum 50 characters.
+
+                    <div
+                      id="item-help"
+                      class="
+                        form-text
+                      "
+                    >
+                      Enter an item or
+                      choose a category
+                      below. Maximum
+                      50 characters.
                     </div>
 
                   </div>
 
 
-                  <!-- ================= QUICK CATEGORIES ================= -->
-                  <div class="mb-4">
+                  <!-- =========================================== -->
+                  <!-- Quick categories -->
+                  <!-- =========================================== -->
 
-                    <p class="fw-semibold mb-2">
+                  <fieldset
+                    class="
+                      mb-4
+                      border-0
+                      p-0
+                    "
+                  >
+
+                    <legend
+                      class="
+                        fs-6
+                        fw-semibold
+                        mb-2
+                      "
+                    >
                       Quick Categories
+                    </legend>
+
+
+                    <p
+                      id="category-help"
+                      class="
+                        small
+                        text-secondary
+                        mb-3
+                      "
+                    >
+                      Select a category
+                      to fill the material
+                      field automatically.
                     </p>
 
-                    <div class="d-flex flex-wrap gap-2">
+
+                    <div
+                      class="
+                        d-flex
+                        flex-wrap
+                        gap-2
+                      "
+                      aria-describedby="category-help"
+                    >
 
                       <button
-                        v-for="category in categories"
-                        :key="category"
+                        v-for="
+                          category in
+                          categories
+                        "
+                        :key="
+                          category
+                        "
                         type="button"
                         class="btn"
                         :class="
-                          item === category
+                          item ===
+                          category
                             ? 'btn-success'
                             : 'btn-outline-success'
                         "
-                        @click="selectCategory(category)"
+                        :aria-pressed="
+                          item ===
+                          category
+                            ? 'true'
+                            : 'false'
+                        "
+                        @click="
+                          selectCategory(
+                            category,
+                          )
+                        "
                       >
-                        {{ category }}
+                        {{
+                          category
+                        }}
                       </button>
 
                     </div>
 
-                  </div>
+                  </fieldset>
 
 
-                  <!-- ================= POSTCODE ================= -->
-                  <div class="mb-4">
+                  <!-- =========================================== -->
+                  <!-- Postcode -->
+                  <!-- =========================================== -->
+
+                  <div
+                    class="mb-4"
+                  >
 
                     <label
                       for="postcode"
-                      class="form-label fw-semibold"
+                      class="
+                        form-label
+                        fw-semibold
+                      "
                     >
                       Postcode
-                      <span class="text-danger">*</span>
+
+                      <span
+                        class="
+                          text-danger
+                        "
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+
+                      <span
+                        class="
+                          visually-hidden
+                        "
+                      >
+                        required
+                      </span>
                     </label>
+
 
                     <input
                       id="postcode"
-                      v-model.trim="postcode"
+                      ref="postcodeInput"
+                      v-model.trim="
+                        postcode
+                      "
                       type="text"
                       inputmode="numeric"
+                      pattern="[0-9]*"
                       maxlength="4"
-                      class="form-control form-control-lg"
+                      class="
+                        form-control
+                        form-control-lg
+                      "
                       :class="{
-                        'is-invalid': postcodeError
+                        'is-invalid':
+                          postcodeError,
                       }"
                       placeholder="e.g. 3168"
+                      autocomplete="postal-code"
+                      required
+                      aria-required="true"
+                      :aria-invalid="
+                        postcodeError
+                          ? 'true'
+                          : 'false'
+                      "
+                      :aria-describedby="
+                        postcodeError
+                          ? 'postcode-help postcode-error'
+                          : 'postcode-help'
+                      "
                     />
 
+
                     <div
-                      v-if="postcodeError"
-                      class="invalid-feedback"
+                      v-if="
+                        postcodeError
+                      "
+                      id="postcode-error"
+                      class="
+                        invalid-feedback
+                      "
+                      role="alert"
                     >
-                      {{ postcodeError }}
+                      {{
+                        postcodeError
+                      }}
                     </div>
 
-                    <div class="form-text">
-                      Enter a postcode in the current Victorian
-                      service area (3000–3999).
+
+                    <div
+                      id="postcode-help"
+                      class="
+                        form-text
+                      "
+                    >
+                      Enter a postcode
+                      in the current
+                      Victorian service
+                      area (3000–3999).
                     </div>
 
                   </div>
 
 
-                  <!-- ================= SUBMIT ================= -->
+                  <!-- =========================================== -->
+                  <!-- Submit -->
+                  <!-- =========================================== -->
+
                   <div
                     class="
                       d-grid
@@ -321,17 +794,34 @@ const handleSubmit = () => {
                   >
                     <button
                       type="submit"
-                      class="btn btn-success btn-lg px-4"
+                      class="
+                        btn
+                        btn-success
+                        btn-lg
+                        px-4
+                      "
                     >
-                      Find Recycling Options
+                      Find Recycling
+                      Options
                     </button>
                   </div>
 
 
-                  <!-- ================= RECENT SEARCHES ================= -->
-                  <div
-                    v-if="recentSearches.length > 0"
-                    class="mt-4 pt-4 border-top"
+                  <!-- =========================================== -->
+                  <!-- Recent searches -->
+                  <!-- =========================================== -->
+
+                  <section
+                    v-if="
+                      recentSearches.length >
+                      0
+                    "
+                    class="
+                      mt-4
+                      pt-4
+                      border-top
+                    "
+                    aria-labelledby="recent-searches-title"
                   >
 
                     <div
@@ -346,20 +836,42 @@ const handleSubmit = () => {
 
                       <div>
 
-                        <p class="fw-semibold mb-0">
+                        <h2
+                          id="recent-searches-title"
+                          class="
+                            h6
+                            fw-semibold
+                            mb-0
+                          "
+                        >
                           Recent Searches
-                        </p>
+                        </h2>
 
-                        <small class="text-secondary">
-                          Select a previous search to use it again.
+
+                        <small
+                          class="
+                            text-secondary
+                          "
+                        >
+                          Select a previous
+                          search to use it
+                          again.
                         </small>
 
                       </div>
 
+
                       <button
                         type="button"
-                        class="btn btn-sm btn-outline-secondary"
-                        @click="clearRecentSearches"
+                        class="
+                          btn
+                          btn-sm
+                          btn-outline-secondary
+                        "
+                        aria-label="Clear all recent searches"
+                        @click="
+                          clearRecentSearches
+                        "
                       >
                         Clear
                       </button>
@@ -367,25 +879,56 @@ const handleSubmit = () => {
                     </div>
 
 
-                    <div class="d-flex flex-wrap gap-2">
+                    <div
+                      class="
+                        d-flex
+                        flex-wrap
+                        gap-2
+                      "
+                    >
 
                       <button
-                        v-for="search in recentSearches"
-                        :key="`${search.item}-${search.postcode}`"
+                        v-for="
+                          search in
+                          recentSearches
+                        "
+                        :key="
+                          `${search.item}-${search.postcode}`
+                        "
                         type="button"
-                        class="btn btn-light border"
-                        @click="useRecentSearch(search)"
+                        class="
+                          btn
+                          btn-light
+                          border
+                        "
+                        :aria-label="
+                          `Use recent search ${search.item}, postcode ${search.postcode}`
+                        "
+                        @click="
+                          useRecentSearch(
+                            search,
+                          )
+                        "
                       >
-                        {{ search.item }}
+                        {{
+                          search.item
+                        }}
 
-                        <span class="text-secondary">
-                          · {{ search.postcode }}
+                        <span
+                          class="
+                            text-secondary
+                          "
+                        >
+                          ·
+                          {{
+                            search.postcode
+                          }}
                         </span>
                       </button>
 
                     </div>
 
-                  </div>
+                  </section>
 
                 </form>
 
@@ -393,20 +936,61 @@ const handleSubmit = () => {
             </div>
 
 
-            <!-- ================= INFORMATION ================= -->
-            <div class="row g-4 mt-4">
+            <!-- ================================================= -->
+            <!-- Information cards -->
+            <!-- ================================================= -->
 
-              <div class="col-md-6">
+            <div
+              class="
+                row
+                g-4
+                mt-4
+              "
+            >
 
-                <div class="p-4 bg-light rounded-4 h-100">
+              <div
+                class="
+                  col-md-6
+                "
+              >
 
-                  <h2 class="h5 fw-bold">
-                    ♻ Why recycle correctly?
+                <div
+                  class="
+                    p-4
+                    bg-light
+                    rounded-4
+                    h-100
+                  "
+                >
+
+                  <h2
+                    class="
+                      h5
+                      fw-bold
+                    "
+                  >
+                    <span
+                      aria-hidden="true"
+                    >
+                      ♻
+                    </span>
+
+                    Why recycle
+                    correctly?
                   </h2>
 
-                  <p class="text-secondary mb-0">
-                    Correct disposal helps recover useful materials
-                    and reduces unnecessary waste going to landfill.
+
+                  <p
+                    class="
+                      text-secondary
+                      mb-0
+                    "
+                  >
+                    Correct disposal
+                    helps recover useful
+                    materials and reduces
+                    unnecessary waste
+                    going to landfill.
                   </p>
 
                 </div>
@@ -414,17 +998,48 @@ const handleSubmit = () => {
               </div>
 
 
-              <div class="col-md-6">
+              <div
+                class="
+                  col-md-6
+                "
+              >
 
-                <div class="p-4 bg-light rounded-4 h-100">
+                <div
+                  class="
+                    p-4
+                    bg-light
+                    rounded-4
+                    h-100
+                  "
+                >
 
-                  <h2 class="h5 fw-bold">
-                    📍 Local options
+                  <h2
+                    class="
+                      h5
+                      fw-bold
+                    "
+                  >
+                    <span
+                      aria-hidden="true"
+                    >
+                      📍
+                    </span>
+
+                    Local options
                   </h2>
 
-                  <p class="text-secondary mb-0">
-                    Search results will show suitable services
-                    based on the material and postcode you provide.
+
+                  <p
+                    class="
+                      text-secondary
+                      mb-0
+                    "
+                  >
+                    Search results will
+                    show suitable services
+                    based on the material
+                    and postcode you
+                    provide.
                   </p>
 
                 </div>
@@ -440,14 +1055,20 @@ const handleSubmit = () => {
       </div>
     </section>
 
-  </div>
+  </main>
 </template>
 
 
 <style scoped>
 .finder-intro {
-  max-width: 700px;
+  max-width:
+    700px;
 }
+
+
+/* ===================================================== */
+/* Cards */
+/* ===================================================== */
 
 .card {
   transition:
@@ -455,9 +1076,16 @@ const handleSubmit = () => {
     box-shadow 0.2s ease;
 }
 
+
 .card:hover {
-  transform: translateY(-2px);
+  transform:
+    translateY(-2px);
 }
+
+
+/* ===================================================== */
+/* Buttons */
+/* ===================================================== */
 
 .btn {
   transition:
@@ -465,14 +1093,80 @@ const handleSubmit = () => {
     box-shadow 0.2s ease;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
+
+.btn:hover:not(:disabled) {
+  transform:
+    translateY(-1px);
 }
 
+
+/* ===================================================== */
+/* Form focus */
+/* ===================================================== */
+
 .form-control:focus {
-  border-color: var(--bs-success);
+  border-color:
+    var(--bs-success);
+
   box-shadow:
     0 0 0 0.25rem
-    rgba(25, 135, 84, 0.15);
+    rgba(
+      25,
+      135,
+      84,
+      0.15
+    );
+}
+
+
+/* ===================================================== */
+/* Invalid field focus */
+/* ===================================================== */
+
+.form-control.is-invalid:focus {
+  box-shadow:
+    0 0 0 0.25rem
+    rgba(
+      220,
+      53,
+      69,
+      0.15
+    );
+}
+
+
+/* ===================================================== */
+/* Fieldset */
+/* ===================================================== */
+
+fieldset {
+  min-width:
+    0;
+}
+
+
+/* ===================================================== */
+/* Reduced motion */
+/*
+  Global accessibility.css already handles this.
+  This fallback also protects this component if used
+  independently.
+*/
+/* ===================================================== */
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+  .card,
+  .btn {
+    transition:
+      none;
+  }
+
+  .card:hover,
+  .btn:hover {
+    transform:
+      none;
+  }
 }
 </style>

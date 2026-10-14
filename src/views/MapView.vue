@@ -42,7 +42,8 @@ const ROUTE_LAYER_ID =
 // References
 // ======================================================
 
-const mapContainer = ref(null)
+const mapContainer =
+  ref(null)
 
 let map = null
 
@@ -56,7 +57,8 @@ let userMarker = null
 // Page state
 // ======================================================
 
-const searchTerm = ref('')
+const searchTerm =
+  ref('')
 
 const selectedLocation =
   ref(null)
@@ -84,6 +86,57 @@ const errorMessage =
 
 const statusMessage =
   ref('')
+
+
+// ======================================================
+// Reduced motion
+// ======================================================
+
+function prefersReducedMotion() {
+  return Boolean(
+    window.matchMedia &&
+    window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches,
+  )
+}
+
+
+// ======================================================
+// Accessible map movement
+// ======================================================
+
+function moveMapTo({
+  longitude,
+  latitude,
+  zoom = 14,
+}) {
+  if (!map) {
+    return
+  }
+
+  const center = [
+    longitude,
+    latitude,
+  ]
+
+  if (
+    prefersReducedMotion()
+  ) {
+    map.jumpTo({
+      center,
+      zoom,
+    })
+
+    return
+  }
+
+  map.flyTo({
+    center,
+    zoom,
+    essential: false,
+  })
+}
 
 
 // ======================================================
@@ -133,9 +186,11 @@ const selectedMaterials =
       return ''
     }
 
-    return selectedLocation.value
-      .acceptedMaterials
-      .join(', ')
+    return (
+      selectedLocation.value
+        .acceptedMaterials
+        .join(', ')
+    )
   })
 
 
@@ -148,10 +203,8 @@ const selectedCoordinates =
     }
 
     return [
-      selectedLocation.value
-        .latitude,
-      selectedLocation.value
-        .longitude,
+      selectedLocation.value.latitude,
+      selectedLocation.value.longitude,
     ].join(', ')
   })
 
@@ -174,35 +227,50 @@ function createLocationPopup(
   location,
 ) {
   const wrapper =
-    document.createElement('div')
+    document.createElement(
+      'div',
+    )
 
   wrapper.className =
     'zwv-popup'
 
+
   const title =
-    document.createElement('strong')
+    document.createElement(
+      'strong',
+    )
 
   title.textContent =
     location.name
 
+
   const suburb =
-    document.createElement('div')
+    document.createElement(
+      'div',
+    )
 
   suburb.textContent =
     `${location.suburb} ${location.postcode}`
 
+
   const materials =
-    document.createElement('div')
+    document.createElement(
+      'div',
+    )
 
   materials.textContent =
     location.acceptedMaterials
       .join(', ')
 
+
   const status =
-    document.createElement('div')
+    document.createElement(
+      'div',
+    )
 
   status.textContent =
     `Status: ${location.status}`
+
 
   wrapper.append(
     title,
@@ -211,12 +279,57 @@ function createLocationPopup(
     status,
   )
 
+
   return wrapper
 }
 
 
 // ======================================================
-// Add recycling location markers
+// Marker accessibility
+// ======================================================
+
+function configureMarkerAccessibility({
+  marker,
+  label,
+  onKeyboardActivate,
+}) {
+  const element =
+    marker.getElement()
+
+  element.setAttribute(
+    'role',
+    'button',
+  )
+
+  element.setAttribute(
+    'tabindex',
+    '0',
+  )
+
+  element.setAttribute(
+    'aria-label',
+    label,
+  )
+
+
+  element.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.key === 'Enter' ||
+        event.key === ' '
+      ) {
+        event.preventDefault()
+
+        onKeyboardActivate()
+      }
+    },
+  )
+}
+
+
+// ======================================================
+// Add recycling markers
 // ======================================================
 
 function addLocationMarkers() {
@@ -224,8 +337,10 @@ function addLocationMarkers() {
     return
   }
 
+
   recyclingLocations.forEach(
     (location) => {
+
       const popup =
         new mapboxgl.Popup({
           offset: 24,
@@ -235,6 +350,7 @@ function addLocationMarkers() {
               location,
             ),
           )
+
 
       const marker =
         new mapboxgl.Marker({
@@ -248,22 +364,20 @@ function addLocationMarkers() {
             location.longitude,
             location.latitude,
           ])
-          .setPopup(popup)
-          .addTo(map)
+          .setPopup(
+            popup,
+          )
+          .addTo(
+            map,
+          )
 
-      marker
-        .getElement()
-        .setAttribute(
-          'aria-label',
-          `Select ${location.name}`,
-        )
 
-      marker
-        .getElement()
-        .setAttribute(
-          'tabindex',
-          '0',
-        )
+      // --------------------------------------------------
+      // Mouse click
+      //
+      // Mapbox handles popup opening automatically.
+      // We only update Vue state here.
+      // --------------------------------------------------
 
       marker
         .getElement()
@@ -273,31 +387,32 @@ function addLocationMarkers() {
             selectLocation(
               location,
               false,
+              false,
             )
           },
         )
 
-      marker
-        .getElement()
-        .addEventListener(
-          'keydown',
-          (event) => {
-            if (
-              event.key ===
-                'Enter' ||
-              event.key === ' '
-            ) {
-              event.preventDefault()
 
-              selectLocation(
-                location,
-                false,
-              )
+      // --------------------------------------------------
+      // Keyboard
+      // --------------------------------------------------
 
-              marker.togglePopup()
-            }
+      configureMarkerAccessibility({
+        marker,
+
+        label:
+          `Select ${location.name}, ${location.suburb}, ${location.status}`,
+
+        onKeyboardActivate:
+          () => {
+            selectLocation(
+              location,
+              false,
+              true,
+            )
           },
-        )
+      })
+
 
       locationMarkers.set(
         location.id,
@@ -315,31 +430,44 @@ function addLocationMarkers() {
 function selectLocation(
   location,
   moveMap = true,
+  openPopup = true,
 ) {
   clearMessages()
+
 
   selectedLocation.value =
     location
 
-  routeInfo.value = null
+  routeInfo.value =
+    null
 
   clearRoute()
+
+
+  // --------------------------------------------------
+  // Move map
+  // --------------------------------------------------
 
   if (
     moveMap &&
     map
   ) {
-    map.flyTo({
-      center: [
+    moveMapTo({
+      longitude:
         location.longitude,
+
+      latitude:
         location.latitude,
-      ],
 
-      zoom: 14,
-
-      essential: true,
+      zoom:
+        14,
     })
   }
+
+
+  // --------------------------------------------------
+  // Popup
+  // --------------------------------------------------
 
   const marker =
     locationMarkers.get(
@@ -347,6 +475,7 @@ function selectLocation(
     )
 
   if (
+    openPopup &&
     marker &&
     !marker
       .getPopup()
@@ -354,6 +483,7 @@ function selectLocation(
   ) {
     marker.togglePopup()
   }
+
 
   statusMessage.value =
     `${location.name} selected as the destination.`
@@ -367,23 +497,34 @@ function selectLocation(
 async function handleUseMyLocation() {
   clearMessages()
 
-  isLocating.value = true
+  isLocating.value =
+    true
+
 
   try {
     const location =
       await getCurrentLocation()
 
+
     userLocation.value =
       location
 
+
+    // Remove previous user marker.
     if (userMarker) {
       userMarker.remove()
     }
+
+
+    // --------------------------------------------------
+    // User popup content
+    // --------------------------------------------------
 
     const popupContent =
       document.createElement(
         'div',
       )
+
 
     const title =
       document.createElement(
@@ -392,6 +533,7 @@ async function handleUseMyLocation() {
 
     title.textContent =
       'Your Location'
+
 
     const accuracy =
       document.createElement(
@@ -403,14 +545,21 @@ async function handleUseMyLocation() {
         location.accuracy,
       )} m`
 
+
     popupContent.append(
       title,
       accuracy,
     )
 
+
+    // --------------------------------------------------
+    // User marker
+    // --------------------------------------------------
+
     userMarker =
       new mapboxgl.Marker({
-        color: '#0d6efd',
+        color:
+          '#0d6efd',
       })
         .setLngLat([
           location.longitude,
@@ -419,32 +568,68 @@ async function handleUseMyLocation() {
         .setPopup(
           new mapboxgl.Popup({
             offset: 24,
-          }).setDOMContent(
-            popupContent,
-          ),
+          })
+            .setDOMContent(
+              popupContent,
+            ),
         )
-        .addTo(map)
+        .addTo(
+          map,
+        )
 
-    map.flyTo({
-      center: [
-        location.longitude,
-        location.latitude,
-      ],
 
-      zoom: 13,
+    // --------------------------------------------------
+    // User marker accessibility
+    // --------------------------------------------------
 
-      essential: true,
+    configureMarkerAccessibility({
+      marker:
+        userMarker,
+
+      label:
+        'Your current location',
+
+      onKeyboardActivate:
+        () => {
+          userMarker
+            ?.togglePopup()
+        },
     })
+
+
+    // --------------------------------------------------
+    // Move map
+    // --------------------------------------------------
+
+    moveMapTo({
+      longitude:
+        location.longitude,
+
+      latitude:
+        location.latitude,
+
+      zoom:
+        13,
+    })
+
 
     statusMessage.value =
       'Your current location has been added to the map.'
 
-    routeInfo.value = null
+
+    routeInfo.value =
+      null
 
     clearRoute()
   } catch (error) {
+    console.error(
+      'Geolocation failed:',
+      error,
+    )
+
     errorMessage.value =
-      error.message
+      error?.message ||
+      'Unable to access your current location.'
   } finally {
     isLocating.value =
       false
@@ -464,6 +649,7 @@ function clearRoute() {
     return
   }
 
+
   if (
     map.getLayer(
       ROUTE_LAYER_ID,
@@ -473,6 +659,7 @@ function clearRoute() {
       ROUTE_LAYER_ID,
     )
   }
+
 
   if (
     map.getSource(
@@ -490,7 +677,9 @@ function clearRoute() {
 // Draw route
 // ======================================================
 
-function drawRoute(geometry) {
+function drawRoute(
+  geometry,
+) {
   if (
     !map ||
     !mapReady.value
@@ -498,46 +687,63 @@ function drawRoute(geometry) {
     return
   }
 
+
   clearRoute()
+
 
   map.addSource(
     ROUTE_SOURCE_ID,
     {
-      type: 'geojson',
+      type:
+        'geojson',
 
       data: {
-        type: 'Feature',
+        type:
+          'Feature',
 
-        properties: {},
+        properties:
+          {},
 
         geometry,
       },
     },
   )
 
+
   map.addLayer({
-    id: ROUTE_LAYER_ID,
+    id:
+      ROUTE_LAYER_ID,
 
-    type: 'line',
+    type:
+      'line',
 
-    source: ROUTE_SOURCE_ID,
+    source:
+      ROUTE_SOURCE_ID,
 
     layout: {
-      'line-join': 'round',
-      'line-cap': 'round',
+      'line-join':
+        'round',
+
+      'line-cap':
+        'round',
     },
 
     paint: {
-      'line-color': '#198754',
-      'line-width': 6,
-      'line-opacity': 0.85,
+      'line-color':
+        '#198754',
+
+      'line-width':
+        6,
+
+      'line-opacity':
+        0.85,
     },
   })
 }
 
 
 // ======================================================
-// Fit map to route
+// Fit route on map
 // ======================================================
 
 function fitMapToRoute(
@@ -550,24 +756,29 @@ function fitMapToRoute(
     return
   }
 
+
   const coordinates =
     geometry.coordinates
 
+
   if (
-    coordinates.length === 0
+    coordinates.length ===
+    0
   ) {
     return
   }
+
 
   const bounds =
     coordinates.reduce(
       (
         currentBounds,
         coordinate,
-      ) =>
-        currentBounds.extend(
+      ) => {
+        return currentBounds.extend(
           coordinate,
-        ),
+        )
+      },
 
       new mapboxgl.LngLatBounds(
         coordinates[0],
@@ -575,12 +786,20 @@ function fitMapToRoute(
       ),
     )
 
+
   map.fitBounds(
     bounds,
     {
-      padding: 80,
-      maxZoom: 15,
-      duration: 900,
+      padding:
+        80,
+
+      maxZoom:
+        15,
+
+      duration:
+        prefersReducedMotion()
+          ? 0
+          : 900,
     },
   )
 }
@@ -593,6 +812,11 @@ function fitMapToRoute(
 async function handlePlanRoute() {
   clearMessages()
 
+
+  // --------------------------------------------------
+  // Require user location
+  // --------------------------------------------------
+
   if (
     !userLocation.value
   ) {
@@ -601,6 +825,11 @@ async function handlePlanRoute() {
 
     return
   }
+
+
+  // --------------------------------------------------
+  // Require destination
+  // --------------------------------------------------
 
   if (
     !selectedLocation.value
@@ -611,7 +840,10 @@ async function handlePlanRoute() {
     return
   }
 
-  isRouting.value = true
+
+  isRouting.value =
+    true
+
 
   try {
     const route =
@@ -640,22 +872,32 @@ async function handlePlanRoute() {
           travelMode.value,
       })
 
+
     routeInfo.value =
       route
+
 
     drawRoute(
       route.geometry,
     )
 
+
     fitMapToRoute(
       route.geometry,
     )
 
+
     statusMessage.value =
       `Route to ${selectedLocation.value.name} calculated successfully.`
   } catch (error) {
+    console.error(
+      'Route calculation failed:',
+      error,
+    )
+
     errorMessage.value =
-      error.message
+      error?.message ||
+      'Unable to calculate the route.'
   } finally {
     isRouting.value =
       false
@@ -670,14 +912,19 @@ async function handlePlanRoute() {
 function clearSelection() {
   clearMessages()
 
+
   selectedLocation.value =
     null
 
-  routeInfo.value = null
+  routeInfo.value =
+    null
 
-  searchTerm.value = ''
+  searchTerm.value =
+    ''
+
 
   clearRoute()
+
 
   statusMessage.value =
     'Destination selection cleared.'
@@ -688,106 +935,144 @@ function clearSelection() {
 // Initialise Mapbox
 // ======================================================
 
-onMounted(async () => {
-  if (
-    !isMapboxConfigured()
-  ) {
-    errorMessage.value =
-      'Mapbox is not configured. Check VITE_MAPBOX_ACCESS_TOKEN in your .env file.'
+onMounted(
+  async () => {
 
-    return
-  }
+    if (
+      !isMapboxConfigured()
+    ) {
+      errorMessage.value =
+        'Mapbox is not configured. Check VITE_MAPBOX_ACCESS_TOKEN in your .env file.'
 
-  mapboxgl.accessToken =
-    MAPBOX_ACCESS_TOKEN
-
-  await nextTick()
-
-  map =
-    new mapboxgl.Map({
-      container:
-        mapContainer.value,
-
-      style:
-        'mapbox://styles/mapbox/streets-v12',
-
-      center: [
-        145.13,
-        -37.92,
-      ],
-
-      zoom: 10.5,
-    })
+      return
+    }
 
 
-  // Map navigation buttons
-  map.addControl(
-    new mapboxgl.NavigationControl(),
-
-    'top-right',
-  )
+    mapboxgl.accessToken =
+      MAPBOX_ACCESS_TOKEN
 
 
-  // Scale
-  map.addControl(
-    new mapboxgl.ScaleControl({
-      maxWidth: 120,
-      unit: 'metric',
-    }),
-
-    'bottom-left',
-  )
+    await nextTick()
 
 
-  map.on(
-    'load',
-    () => {
-      mapReady.value = true
+    map =
+      new mapboxgl.Map({
+        container:
+          mapContainer.value,
 
-      addLocationMarkers()
-    },
-  )
-})
+        style:
+          'mapbox://styles/mapbox/streets-v12',
+
+        center: [
+          145.13,
+          -37.92,
+        ],
+
+        zoom:
+          10.5,
+      })
+
+
+    // --------------------------------------------------
+    // Navigation controls
+    // --------------------------------------------------
+
+    map.addControl(
+      new mapboxgl.NavigationControl(),
+
+      'top-right',
+    )
+
+
+    // --------------------------------------------------
+    // Scale
+    // --------------------------------------------------
+
+    map.addControl(
+      new mapboxgl.ScaleControl({
+        maxWidth:
+          120,
+
+        unit:
+          'metric',
+      }),
+
+      'bottom-left',
+    )
+
+
+    // --------------------------------------------------
+    // Map ready
+    // --------------------------------------------------
+
+    map.on(
+      'load',
+      () => {
+        mapReady.value =
+          true
+
+        addLocationMarkers()
+      },
+    )
+  },
+)
 
 
 // ======================================================
 // Cleanup
 // ======================================================
 
-onUnmounted(() => {
-  locationMarkers.forEach(
-    (marker) => {
-      marker.remove()
-    },
-  )
+onUnmounted(
+  () => {
 
-  locationMarkers.clear()
+    locationMarkers.forEach(
+      (marker) => {
+        marker.remove()
+      },
+    )
 
-  if (userMarker) {
-    userMarker.remove()
-    userMarker = null
-  }
 
-  if (map) {
-    map.remove()
-    map = null
-  }
-})
+    locationMarkers.clear()
+
+
+    if (userMarker) {
+      userMarker.remove()
+      userMarker = null
+    }
+
+
+    if (map) {
+      map.remove()
+      map = null
+    }
+  },
+)
 </script>
 
 
 <template>
-  <main class="map-page">
+  <main
+    class="map-page"
+    aria-labelledby="map-title"
+  >
 
     <!-- ================================================= -->
     <!-- Header -->
     <!-- ================================================= -->
 
     <section
-      class="map-header py-5"
+      class="
+        map-header
+        py-5
+      "
       aria-labelledby="map-title"
     >
-      <div class="container py-lg-4">
+      <div
+        class="
+          container
+          py-lg-4
+        "
+      >
 
         <p
           class="
@@ -799,6 +1084,7 @@ onUnmounted(() => {
         >
           Recycling Map
         </p>
+
 
         <h1
           id="map-title"
@@ -812,6 +1098,7 @@ onUnmounted(() => {
           Recycling Locations
         </h1>
 
+
         <p
           class="
             lead
@@ -821,11 +1108,10 @@ onUnmounted(() => {
           "
         >
           Explore recycling points,
-          search for suitable
-          locations, use your current
-          position and calculate a
-          driving, walking or cycling
-          route.
+          search for suitable locations,
+          use your current position and
+          calculate a driving, walking
+          or cycling route.
         </p>
 
       </div>
@@ -833,41 +1119,83 @@ onUnmounted(() => {
 
 
     <!-- ================================================= -->
-    <!-- Main map -->
+    <!-- Main map tools -->
     <!-- ================================================= -->
 
-    <section class="py-5">
+    <section
+      class="py-5"
+      aria-labelledby="map-tools-title"
+    >
       <div class="container">
 
+        <h2
+          id="map-tools-title"
+          class="visually-hidden"
+        >
+          Recycling map search,
+          location and route tools
+        </h2>
+
+
+        <!-- ================================================= -->
         <!-- Error -->
+        <!-- ================================================= -->
+
         <div
-          v-if="errorMessage"
-          class="alert alert-danger"
+          v-if="
+            errorMessage
+          "
+          class="
+            alert
+            alert-danger
+          "
           role="alert"
           aria-live="assertive"
+          aria-atomic="true"
         >
-          {{ errorMessage }}
+          {{
+            errorMessage
+          }}
         </div>
 
 
+        <!-- ================================================= -->
         <!-- Status -->
+        <!-- ================================================= -->
+
         <div
-          v-if="statusMessage"
-          class="alert alert-success"
+          v-if="
+            statusMessage
+          "
+          class="
+            alert
+            alert-success
+          "
           role="status"
           aria-live="polite"
+          aria-atomic="true"
         >
-          {{ statusMessage }}
+          {{
+            statusMessage
+          }}
         </div>
 
 
-        <div class="row g-4">
+        <div
+          class="
+            row
+            g-4
+          "
+        >
 
-          <!-- ============================================= -->
+          <!-- ================================================= -->
           <!-- Controls -->
-          <!-- ============================================= -->
+          <!-- ================================================= -->
 
-          <div class="col-lg-4">
+          <aside
+            class="col-lg-4"
+            aria-label="Map search and route controls"
+          >
 
             <div
               class="
@@ -876,8 +1204,13 @@ onUnmounted(() => {
               "
             >
 
+              <!-- ============================================= -->
               <!-- POI search -->
-              <div class="mb-4">
+              <!-- ============================================= -->
+
+              <div
+                class="mb-4"
+              >
 
                 <label
                   for="poi-search"
@@ -890,38 +1223,72 @@ onUnmounted(() => {
                   Locations
                 </label>
 
+
                 <input
                   id="poi-search"
-                  v-model="searchTerm"
+                  v-model="
+                    searchTerm
+                  "
                   type="search"
-                  class="form-control"
+                  class="
+                    form-control
+                  "
                   placeholder="Search by name, suburb, postcode or material..."
+                  autocomplete="off"
+                  aria-describedby="poi-search-help poi-results-count"
                 />
 
-                <div class="form-text">
+
+                <div
+                  id="poi-search-help"
+                  class="
+                    form-text
+                  "
+                >
                   Search across all
-                  {{ recyclingLocations.length }}
+                  {{
+                    recyclingLocations.length
+                  }}
                   recycling points.
                 </div>
 
               </div>
 
 
+              <!-- ============================================= -->
               <!-- Search results -->
-              <div
+              <!-- ============================================= -->
+
+              <section
                 class="
                   poi-results
                   mb-4
                 "
-                aria-label="Recycling location search results"
+                aria-labelledby="poi-results-title"
               >
-                <p
+
+                <h2
+                  id="poi-results-title"
                   class="
-                    small
-                    fw-semibold
+                    h6
+                    fw-bold
                     mb-2
                   "
+                >
+                  Search Results
+                </h2>
+
+
+                <p
+                  id="poi-results-count"
+                  class="
+                    small
+                    text-secondary
+                    mb-2
+                  "
+                  role="status"
                   aria-live="polite"
+                  aria-atomic="true"
                 >
                   {{
                     filteredLocations.length
@@ -940,12 +1307,15 @@ onUnmounted(() => {
                     gap-2
                   "
                 >
+
                   <button
                     v-for="
                       location in
                       filteredLocations
                     "
-                    :key="location.id"
+                    :key="
+                      location.id
+                    "
                     type="button"
                     class="
                       location-result
@@ -956,20 +1326,33 @@ onUnmounted(() => {
                         selectedLocation?.id ===
                         location.id,
                     }"
+                    :aria-pressed="
+                      selectedLocation?.id ===
+                      location.id
+                        ? 'true'
+                        : 'false'
+                    "
+                    :aria-label="
+                      `${location.name}, ${location.suburb} ${location.postcode}, ${location.status}`
+                    "
                     @click="
                       selectLocation(
                         location,
                       )
                     "
                   >
+
                     <span
                       class="
                         d-block
                         fw-semibold
                       "
                     >
-                      {{ location.name }}
+                      {{
+                        location.name
+                      }}
                     </span>
+
 
                     <span
                       class="
@@ -977,14 +1360,23 @@ onUnmounted(() => {
                         small
                         text-secondary
                       "
+                      aria-hidden="true"
                     >
-                      {{ location.suburb }}
+                      {{
+                        location.suburb
+                      }}
                       ·
-                      {{ location.postcode }}
+                      {{
+                        location.postcode
+                      }}
                       ·
-                      {{ location.status }}
+                      {{
+                        location.status
+                      }}
                     </span>
+
                   </button>
+
                 </div>
 
 
@@ -997,17 +1389,26 @@ onUnmounted(() => {
                     bg-light
                     rounded-3
                   "
+                  role="status"
                 >
                   No matching recycling
                   locations found.
                 </div>
-              </div>
+
+              </section>
 
 
+              <!-- ============================================= -->
               <!-- My location -->
-              <div class="mb-4">
+              <!-- ============================================= -->
+
+              <section
+                class="mb-4"
+                aria-labelledby="your-location-title"
+              >
 
                 <h2
+                  id="your-location-title"
                   class="
                     h6
                     fw-bold
@@ -1016,6 +1417,7 @@ onUnmounted(() => {
                 >
                   Your Location
                 </h2>
+
 
                 <button
                   type="button"
@@ -1027,27 +1429,44 @@ onUnmounted(() => {
                   :disabled="
                     isLocating
                   "
+                  :aria-busy="
+                    isLocating
+                      ? 'true'
+                      : 'false'
+                  "
                   @click="
                     handleUseMyLocation
                   "
                 >
-                  <span
+
+                  <template
                     v-if="
                       isLocating
                     "
-                    class="
-                      spinner-border
-                      spinner-border-sm
-                      me-2
-                    "
-                    aria-hidden="true"
-                  />
+                  >
+                    <span
+                      class="
+                        spinner-border
+                        spinner-border-sm
+                        me-2
+                      "
+                      aria-hidden="true"
+                    ></span>
 
-                  {{
-                    isLocating
-                      ? 'Locating...'
-                      : '📍 Use My Location'
-                  }}
+                    Locating...
+                  </template>
+
+
+                  <template v-else>
+                    <span
+                      aria-hidden="true"
+                    >
+                      📍
+                    </span>
+
+                    Use My Location
+                  </template>
+
                 </button>
 
 
@@ -1067,22 +1486,32 @@ onUnmounted(() => {
                   >
                     Location available
                     · accuracy approximately
+
                     {{
                       Math.round(
                         userLocation.accuracy,
                       )
                     }}
+
                     m
                   </small>
                 </div>
 
-              </div>
+              </section>
 
 
+              <!-- ============================================= -->
               <!-- Travel mode -->
+              <!-- ============================================= -->
+
               <fieldset
-                class="mb-4"
+                class="
+                  mb-4
+                  border-0
+                  p-0
+                "
               >
+
                 <legend
                   class="
                     h6
@@ -1100,6 +1529,7 @@ onUnmounted(() => {
                     gap-2
                   "
                 >
+
                   <label
                     v-for="
                       mode in
@@ -1117,6 +1547,7 @@ onUnmounted(() => {
                         mode.value,
                     }"
                   >
+
                     <input
                       v-model="
                         travelMode
@@ -1133,12 +1564,18 @@ onUnmounted(() => {
                         mode.label
                       }}
                     </span>
+
                   </label>
+
                 </div>
+
               </fieldset>
 
 
+              <!-- ============================================= -->
               <!-- Route button -->
+              <!-- ============================================= -->
+
               <button
                 type="button"
                 class="
@@ -1150,27 +1587,38 @@ onUnmounted(() => {
                 :disabled="
                   isRouting
                 "
+                :aria-busy="
+                  isRouting
+                    ? 'true'
+                    : 'false'
+                "
                 @click="
                   handlePlanRoute
                 "
               >
-                <span
+
+                <template
                   v-if="
                     isRouting
                   "
-                  class="
-                    spinner-border
-                    spinner-border-sm
-                    me-2
-                  "
-                  aria-hidden="true"
-                />
+                >
+                  <span
+                    class="
+                      spinner-border
+                      spinner-border-sm
+                      me-2
+                    "
+                    aria-hidden="true"
+                  ></span>
 
-                {{
-                  isRouting
-                    ? 'Planning Route...'
-                    : 'Plan Route'
-                }}
+                  Planning Route...
+                </template>
+
+
+                <template v-else>
+                  Plan Route
+                </template>
+
               </button>
 
 
@@ -1191,11 +1639,11 @@ onUnmounted(() => {
             </div>
 
 
-            <!-- =========================================== -->
+            <!-- ================================================= -->
             <!-- Selected location -->
-            <!-- =========================================== -->
+            <!-- ================================================= -->
 
-            <div
+            <section
               v-if="
                 selectedLocation
               "
@@ -1204,7 +1652,9 @@ onUnmounted(() => {
                 mt-4
                 p-4
               "
+              aria-labelledby="selected-location-title"
             >
+
               <p
                 class="
                   section-label
@@ -1214,7 +1664,9 @@ onUnmounted(() => {
                 SELECTED LOCATION
               </p>
 
+
               <h2
+                id="selected-location-title"
                 class="
                   h5
                   fw-bold
@@ -1233,6 +1685,7 @@ onUnmounted(() => {
                   mb-0
                 "
               >
+
                 <div>
                   <dt>
                     Suburb
@@ -1242,6 +1695,7 @@ onUnmounted(() => {
                     {{
                       selectedLocation.suburb
                     }}
+
                     {{
                       selectedLocation.postcode
                     }}
@@ -1300,23 +1754,28 @@ onUnmounted(() => {
                     }}
                   </dd>
                 </div>
+
               </dl>
-            </div>
+
+            </section>
 
 
-            <!-- =========================================== -->
-            <!-- Trip info -->
-            <!-- =========================================== -->
+            <!-- ================================================= -->
+            <!-- Trip information -->
+            <!-- ================================================= -->
 
-            <div
-              v-if="routeInfo"
+            <section
+              v-if="
+                routeInfo
+              "
               class="
                 route-card
                 mt-4
                 p-4
               "
-              aria-live="polite"
+              aria-labelledby="route-summary-title"
             >
+
               <p
                 class="
                   section-label
@@ -1326,7 +1785,9 @@ onUnmounted(() => {
                 TRIP INFORMATION
               </p>
 
+
               <h2
+                id="route-summary-title"
                 class="
                   h5
                   fw-bold
@@ -1343,16 +1804,19 @@ onUnmounted(() => {
                   g-3
                 "
               >
+
                 <div
                   class="
                     col-6
                   "
                 >
+
                   <div
                     class="
                       route-stat
                     "
                   >
+
                     <span
                       class="
                         stat-value
@@ -1366,6 +1830,7 @@ onUnmounted(() => {
                       }}
                     </span>
 
+
                     <span
                       class="
                         stat-label
@@ -1373,7 +1838,9 @@ onUnmounted(() => {
                     >
                       Distance
                     </span>
+
                   </div>
+
                 </div>
 
 
@@ -1382,11 +1849,13 @@ onUnmounted(() => {
                     col-6
                   "
                 >
+
                   <div
                     class="
                       route-stat
                     "
                   >
+
                     <span
                       class="
                         stat-value
@@ -1400,6 +1869,7 @@ onUnmounted(() => {
                       }}
                     </span>
 
+
                     <span
                       class="
                         stat-label
@@ -1407,8 +1877,11 @@ onUnmounted(() => {
                     >
                       Estimated time
                     </span>
+
                   </div>
+
                 </div>
+
               </div>
 
 
@@ -1421,22 +1894,51 @@ onUnmounted(() => {
                 "
               >
                 Travel mode:
+
                 <strong>
                   {{
                     routeInfo.profile
                   }}
                 </strong>
               </p>
-            </div>
 
-          </div>
+            </section>
+
+          </aside>
 
 
-          <!-- ============================================= -->
+          <!-- ================================================= -->
           <!-- Map -->
-          <!-- ============================================= -->
+          <!-- ================================================= -->
 
-          <div class="col-lg-8">
+          <div
+            class="
+              col-lg-8
+            "
+          >
+
+            <!--
+              Screen-reader text alternative.
+            -->
+
+            <p
+              id="map-accessibility-description"
+              class="
+                visually-hidden
+              "
+            >
+              The interactive map
+              visually displays
+              recycling locations and
+              calculated routes.
+
+              All recycling destinations
+              can also be searched and
+              selected from the
+              accessible location list
+              beside the map.
+            </p>
+
 
             <div
               class="
@@ -1444,29 +1946,44 @@ onUnmounted(() => {
                 overflow-hidden
               "
             >
-              <div
-                ref="mapContainer"
-                class="map-container"
-                role="application"
-                aria-label="Interactive Mapbox recycling locations map"
-              />
 
+              <div
+                ref="
+                  mapContainer
+                "
+                class="
+                  map-container
+                "
+                role="region"
+                aria-label="Interactive recycling locations map"
+                aria-describedby="map-accessibility-description"
+              ></div>
+
+
+              <!-- ============================================= -->
               <!-- Legend -->
+              <!-- ============================================= -->
+
               <div
                 class="
                   map-legend
                 "
+                role="group"
                 aria-label="Map legend"
               >
+
                 <div>
                   <span
                     class="
                       legend-dot
                       open
                     "
+                    aria-hidden="true"
                   ></span>
+
                   Open location
                 </div>
+
 
                 <div>
                   <span
@@ -1474,9 +1991,12 @@ onUnmounted(() => {
                       legend-dot
                       closed
                     "
+                    aria-hidden="true"
                   ></span>
+
                   Closed location
                 </div>
+
 
                 <div>
                   <span
@@ -1484,19 +2004,29 @@ onUnmounted(() => {
                       legend-dot
                       user
                     "
+                    aria-hidden="true"
                   ></span>
+
                   Your location
                 </div>
+
               </div>
+
             </div>
 
+
+            <!-- ================================================= -->
+            <!-- Demo notice -->
+            <!-- ================================================= -->
 
             <div
               class="
                 map-note
                 mt-3
               "
+              role="note"
             >
+
               <strong>
                 Demo data notice:
               </strong>
@@ -1508,6 +2038,7 @@ onUnmounted(() => {
               and should not be treated
               as official facility
               addresses.
+
             </div>
 
           </div>
@@ -1522,10 +2053,19 @@ onUnmounted(() => {
 
 
 <style scoped>
+
+/* ===================================================== */
+/* Page */
+/* ===================================================== */
+
 .map-page {
-  min-height: 100vh;
-  background-color: #ffffff;
+  min-height:
+    100vh;
+
+  background-color:
+    #ffffff;
 }
+
 
 .map-header {
   background:
@@ -1536,8 +2076,10 @@ onUnmounted(() => {
     );
 }
 
+
 .map-intro {
-  max-width: 820px;
+  max-width:
+    820px;
 }
 
 
@@ -1549,12 +2091,15 @@ onUnmounted(() => {
 .selected-card,
 .route-card,
 .map-card {
-  background-color: #ffffff;
+  background-color:
+    #ffffff;
 
   border:
-    1px solid #e9ecef;
+    1px solid
+    #e9ecef;
 
-  border-radius: 18px;
+  border-radius:
+    18px;
 
   box-shadow:
     0 0.4rem 1.4rem
@@ -1572,12 +2117,17 @@ onUnmounted(() => {
 /* ===================================================== */
 
 .poi-results {
-  max-height: 320px;
-  overflow-y: auto;
+  max-height:
+    320px;
+
+  overflow-y:
+    auto;
 }
 
+
 .location-result {
-  width: 100%;
+  width:
+    100%;
 
   padding:
     0.75rem 0.9rem;
@@ -1586,15 +2136,18 @@ onUnmounted(() => {
     #ffffff;
 
   border:
-    1px solid #dee2e6;
+    1px solid
+    #dee2e6;
 
-  border-radius: 10px;
+  border-radius:
+    10px;
 
   transition:
     border-color 0.15s ease,
     background-color 0.15s ease,
     transform 0.15s ease;
 }
+
 
 .location-result:hover {
   background-color:
@@ -1607,18 +2160,16 @@ onUnmounted(() => {
     translateY(-1px);
 }
 
+
 .location-result:focus-visible {
   outline:
     3px solid
-    rgba(
-      25,
-      135,
-      84,
-      0.25
-    );
+    #198754;
 
-  outline-offset: 2px;
+  outline-offset:
+    3px;
 }
+
 
 .location-result.selected {
   background-color:
@@ -1639,23 +2190,32 @@ onUnmounted(() => {
 /* ===================================================== */
 
 .travel-option {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    0.75rem;
 
   padding:
     0.7rem 0.9rem;
 
-  cursor: pointer;
+  cursor:
+    pointer;
 
   background-color:
     #ffffff;
 
   border:
-    1px solid #dee2e6;
+    1px solid
+    #dee2e6;
 
-  border-radius: 10px;
+  border-radius:
+    10px;
 }
+
 
 .travel-option.active {
   background-color:
@@ -1670,78 +2230,130 @@ onUnmounted(() => {
     var(--bs-success);
 }
 
+
 .travel-option input {
   accent-color:
     var(--bs-success);
 }
 
 
+/*
+  IMPORTANT:
+  The pseudo-class must remain
+  together as :focus-within.
+*/
+.travel-option:focus-within {
+  outline:
+    3px solid
+    rgba(
+      25,
+      135,
+      84,
+      0.35
+    );
+
+  outline-offset:
+    2px;
+}
+
+
 /* ===================================================== */
-/* Location / route cards */
+/* Selected location / route cards */
 /* ===================================================== */
 
 .section-label {
   color:
     var(--bs-success);
 
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size:
+    0.72rem;
+
+  font-weight:
+    700;
 
   letter-spacing:
     0.12em;
 }
 
+
 .selected-details {
-  display: grid;
-  gap: 0.9rem;
+  display:
+    grid;
+
+  gap:
+    0.9rem;
 }
 
+
 .selected-details div {
-  display: grid;
+  display:
+    grid;
 
   grid-template-columns:
     100px 1fr;
 
-  gap: 1rem;
+  gap:
+    1rem;
 }
+
 
 .selected-details dt {
-  color: #6c757d;
-  font-size: 0.85rem;
+  color:
+    #495057;
+
+  font-size:
+    0.85rem;
 }
+
 
 .selected-details dd {
-  margin: 0;
+  margin:
+    0;
 
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size:
+    0.9rem;
+
+  font-weight:
+    500;
 }
 
-.route-stat {
-  padding: 1rem;
 
-  text-align: center;
+.route-stat {
+  padding:
+    1rem;
+
+  text-align:
+    center;
 
   background-color:
     #f8f9fa;
 
-  border-radius: 12px;
+  border-radius:
+    12px;
 }
 
+
 .stat-value {
-  display: block;
+  display:
+    block;
 
   margin-bottom:
     0.2rem;
 
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-size:
+    1.3rem;
+
+  font-weight:
+    700;
 }
 
-.stat-label {
-  color: #6c757d;
 
-  font-size: 0.8rem;
+.stat-label {
+  color:
+    #495057;
+
+  font-size:
+    0.8rem;
 }
 
 
@@ -1750,37 +2362,87 @@ onUnmounted(() => {
 /* ===================================================== */
 
 .map-card {
-  position: relative;
+  position:
+    relative;
 }
+
 
 .map-container {
-  width: 100%;
-  height: 680px;
+  width:
+    100%;
+
+  height:
+    680px;
 }
 
+
+/*
+  Mapbox controls and markers
+  are dynamically inserted.
+
+  Keep these :deep selectors
+  on ONE selector expression.
+*/
+
+:deep(.mapboxgl-ctrl button:focus-visible) {
+  outline:
+    3px solid
+    #198754;
+
+  outline-offset:
+    3px;
+}
+
+
+:deep(.mapboxgl-marker:focus-visible) {
+  outline:
+    3px solid
+    #198754;
+
+  outline-offset:
+    3px;
+
+  border-radius:
+    50%;
+}
+
+
+/* ===================================================== */
+/* Map legend */
+/* ===================================================== */
+
 .map-legend {
-  position: absolute;
+  position:
+    absolute;
 
-  left: 1rem;
-  bottom: 2.5rem;
+  left:
+    1rem;
 
-  display: grid;
-  gap: 0.35rem;
+  bottom:
+    2.5rem;
+
+  display:
+    grid;
+
+  gap:
+    0.35rem;
 
   padding:
     0.7rem 0.9rem;
 
-  font-size: 0.8rem;
+  font-size:
+    0.8rem;
 
   background-color:
     rgba(
       255,
       255,
       255,
-      0.94
+      0.96
     );
 
-  border-radius: 10px;
+  border-radius:
+    10px;
 
   box-shadow:
     0 0.2rem 0.8rem
@@ -1792,49 +2454,68 @@ onUnmounted(() => {
     );
 }
 
+
 .legend-dot {
   display:
     inline-block;
 
-  width: 10px;
-  height: 10px;
+  width:
+    10px;
+
+  height:
+    10px;
 
   margin-right:
     0.4rem;
 
-  border-radius: 50%;
+  border-radius:
+    50%;
 }
+
 
 .legend-dot.open {
-  background-color: #198754;
+  background-color:
+    #198754;
 }
+
 
 .legend-dot.closed {
-  background-color: #6c757d;
+  background-color:
+    #6c757d;
 }
 
+
 .legend-dot.user {
-  background-color: #0d6efd;
+  background-color:
+    #0d6efd;
 }
 
 
 /* ===================================================== */
-/* Other */
+/* Demo notice */
 /* ===================================================== */
 
 .map-note {
   padding:
     0.9rem 1rem;
 
-  color: #6c757d;
+  color:
+    #495057;
 
-  font-size: 0.85rem;
+  font-size:
+    0.85rem;
 
   background-color:
     #f8f9fa;
 
-  border-radius: 10px;
+  border-radius:
+    10px;
 }
+
+
+/* ===================================================== */
+/* Form focus */
+/* ===================================================== */
 
 .form-control:focus {
   border-color:
@@ -1852,28 +2533,60 @@ onUnmounted(() => {
 
 
 /* ===================================================== */
+/* Reduced motion */
+/* ===================================================== */
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+
+  .location-result {
+    transition:
+      none;
+  }
+
+
+  .location-result:hover {
+    transform:
+      none;
+  }
+
+}
+
+
+/* ===================================================== */
 /* Responsive */
 /* ===================================================== */
 
 @media (
   max-width: 991px
 ) {
+
   .map-container {
-    height: 550px;
+    height:
+      550px;
   }
+
 }
+
 
 @media (
   max-width: 576px
 ) {
+
   .map-container {
-    height: 480px;
+    height:
+      480px;
   }
+
 
   .selected-details div {
     grid-template-columns:
       1fr;
-    gap: 0.15rem;
+
+    gap:
+      0.15rem;
   }
+
 }
 </style>
