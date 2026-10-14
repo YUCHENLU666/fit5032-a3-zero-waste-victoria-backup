@@ -1350,7 +1350,6 @@ watch(
         <ul
           class="
             pagination
-            pagination-sm
             mb-0
             flex-wrap
           "
@@ -1626,23 +1625,81 @@ thead th {
 /* Pagination */
 /* ===================================================== */
 
-.page-link {
-  color:
-    var(--bs-success);
+/*
+  Pagination controls use larger touch targets
+  to support users with reduced motor precision
+  and satisfy accessible touch-target guidance.
+*/
+
+.pagination {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    0.5rem;
 }
+
+
+.page-item {
+  margin:
+    0;
+}
+
+
+.page-link {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  min-width:
+    48px;
+
+  min-height:
+    48px;
+
+  padding:
+    0.65rem 0.8rem;
+
+  color:
+    #146c43;
+
+  font-weight:
+    600;
+
+  line-height:
+    1;
+
+  background-color:
+    #ffffff;
+
+  border:
+    1px solid
+    #ced4da;
+
+  border-radius:
+    0.5rem !important;
+}
+
 
 .page-link:hover {
   color:
-    var(--bs-success);
+    #0b5d1e;
 
   background-color:
-    rgba(
-      25,
-      135,
-      84,
-      0.08
-    );
+    #eef7f1;
+
+  border-color:
+    #146c43;
 }
+
 
 .page-item.active
 .page-link {
@@ -1650,29 +1707,62 @@ thead th {
     #ffffff;
 
   background-color:
-    var(--bs-success);
+    #146c43;
 
   border-color:
-    var(--bs-success);
+    #146c43;
 }
 
-.page-link:focus {
+
+.page-link:focus,
+.page-link:focus-visible {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  outline:
+    3px solid
+    #0b5d1e;
+
+  outline-offset:
+    3px;
+
   box-shadow:
-    0 0 0 0.2rem
-    rgba(
-      25,
-      135,
-      84,
-      0.15
-    );
+    none;
 }
+
 
 .page-link:disabled {
   color:
     #6c757d;
 
+  cursor:
+    not-allowed;
+
   background-color:
-    #ffffff;
+    #f8f9fa;
+
+  border-color:
+    #dee2e6;
+
+  opacity:
+    0.7;
+}
+
+
+/*
+  Previous and Next use a slightly wider
+  target because their labels contain text.
+*/
+
+.page-item:first-child
+.page-link,
+.page-item:last-child
+.page-link {
+  min-width:
+    88px;
 }
 
 

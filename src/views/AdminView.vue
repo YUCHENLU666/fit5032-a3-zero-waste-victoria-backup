@@ -57,8 +57,11 @@ const loadError =
 
 const loadUsers =
   async () => {
-    isLoading.value = true
-    loadError.value = ''
+    isLoading.value =
+      true
+
+    loadError.value =
+      ''
 
     try {
       users.value =
@@ -78,6 +81,7 @@ const loadUsers =
   }
 
 
+// Load users when page opens.
 onMounted(() => {
   loadUsers()
 })
@@ -97,7 +101,8 @@ const normalUsers =
   computed(() => {
     return users.value.filter(
       (user) =>
-        user.role === 'user',
+        user.role ===
+        'user',
     ).length
   })
 
@@ -106,7 +111,8 @@ const adminUsers =
   computed(() => {
     return users.value.filter(
       (user) =>
-        user.role === 'admin',
+        user.role ===
+        'admin',
     ).length
   })
 
@@ -122,13 +128,17 @@ const formatDate =
     }
 
 
-    // Support both ISO strings
-    // and Firestore Timestamp objects.
+    // Support both:
+    // 1. ISO date strings
+    // 2. Firestore Timestamp objects.
+
     const date =
       typeof createdAt?.toDate ===
       'function'
         ? createdAt.toDate()
-        : new Date(createdAt)
+        : new Date(
+            createdAt,
+          )
 
 
     if (
@@ -143,9 +153,14 @@ const formatDate =
     return date.toLocaleDateString(
       'en-AU',
       {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+        day:
+          '2-digit',
+
+        month:
+          'short',
+
+        year:
+          'numeric',
       },
     )
   }
@@ -153,14 +168,24 @@ const formatDate =
 
 
 <template>
-  <main class="bg-light py-5">
-    <div class="container">
+  <main
+    class="
+      bg-light
+      py-5
+    "
+    aria-labelledby="admin-page-title"
+  >
+    <div
+      class="
+        container
+      "
+    >
 
       <!-- ================================================= -->
       <!-- Page header -->
       <!-- ================================================= -->
 
-      <div
+      <header
         class="
           d-flex
           flex-column
@@ -173,9 +198,10 @@ const formatDate =
       >
 
         <div>
+
           <p
             class="
-              text-success
+              admin-eyebrow
               fw-semibold
               mb-2
             "
@@ -183,43 +209,90 @@ const formatDate =
             ADMINISTRATION
           </p>
 
-          <h1 class="fw-bold mb-2">
+
+          <h1
+            id="admin-page-title"
+            class="
+              fw-bold
+              mb-2
+            "
+          >
             Admin Dashboard
           </h1>
 
-          <p class="text-muted mb-0">
+
+          <p
+            class="
+              text-muted
+              mb-0
+            "
+          >
             Welcome back,
 
             <strong>
-              {{ currentUser?.username }}
+              {{
+                currentUser?.username ||
+                'Administrator'
+              }}
             </strong>.
 
             Manage and review
             ZWV Circular Hub users.
           </p>
+
         </div>
 
 
+        <!-- ================================================= -->
         <!-- Refresh users -->
+        <!-- ================================================= -->
+
         <button
           type="button"
           class="
             btn
             btn-outline-success
           "
-          :disabled="isLoading"
-          @click="loadUsers"
+          :disabled="
+            isLoading
+          "
+          :aria-busy="
+            isLoading
+              ? 'true'
+              : 'false'
+          "
+          @click="
+            loadUsers
+          "
         >
-          <span v-if="isLoading">
-            Loading...
-          </span>
 
-          <span v-else>
+          <template
+            v-if="
+              isLoading
+            "
+          >
+
+            <span
+              class="
+                spinner-border
+                spinner-border-sm
+                me-2
+              "
+              aria-hidden="true"
+            ></span>
+
+            Refreshing...
+
+          </template>
+
+
+          <template v-else>
             Refresh Users
-          </span>
+          </template>
+
         </button>
 
-      </div>
+      </header>
 
 
       <!-- ================================================= -->
@@ -227,165 +300,315 @@ const formatDate =
       <!-- ================================================= -->
 
       <div
-        v-if="loadError"
-        class="alert alert-danger"
+        v-if="
+          loadError
+        "
+        class="
+          alert
+          alert-danger
+        "
         role="alert"
-        aria-live="polite"
+        aria-live="assertive"
+        aria-atomic="true"
       >
-        {{ loadError }}
+        {{
+          loadError
+        }}
       </div>
 
 
       <!-- ================================================= -->
-      <!-- Statistics -->
+      <!-- Dashboard statistics -->
       <!-- ================================================= -->
 
-      <div class="row g-3 mb-5">
+      <section
+        class="
+          mb-5
+        "
+        aria-labelledby="admin-statistics-title"
+      >
 
-        <!-- Total accounts -->
-        <div class="col-12 col-md-4">
+        <h2
+          id="admin-statistics-title"
+          class="
+            visually-hidden
+          "
+        >
+          User account statistics
+        </h2>
+
+
+        <div
+          class="
+            row
+            g-3
+          "
+        >
+
+          <!-- ================================================= -->
+          <!-- Total accounts -->
+          <!-- ================================================= -->
 
           <div
             class="
-              card
-              border-0
-              shadow-sm
-              h-100
+              col-12
+              col-md-4
             "
           >
-            <div class="card-body p-4">
 
+            <div
+              class="
+                card
+                border-0
+                shadow-sm
+                h-100
+              "
+            >
               <div
                 class="
-                  d-flex
-                  justify-content-between
-                  align-items-center
+                  card-body
+                  p-4
                 "
               >
 
-                <div>
-                  <p class="text-muted mb-1">
-                    Registered Accounts
-                  </p>
+                <div
+                  class="
+                    d-flex
+                    justify-content-between
+                    align-items-center
+                  "
+                >
 
-                  <h2 class="fw-bold mb-0">
-                    {{ totalUsers }}
-                  </h2>
-                </div>
+                  <div>
 
-                <div class="fs-1">
-                  👥
+                    <p
+                      class="
+                        text-muted
+                        mb-1
+                      "
+                    >
+                      Registered Accounts
+                    </p>
+
+
+                    <p
+                      class="
+                        statistic-value
+                        fw-bold
+                        mb-0
+                      "
+                      aria-label="Total registered accounts"
+                    >
+                      {{
+                        totalUsers
+                      }}
+                    </p>
+
+                  </div>
+
+
+                  <div
+                    class="
+                      fs-1
+                    "
+                    aria-hidden="true"
+                  >
+                    👥
+                  </div>
+
                 </div>
 
               </div>
-
             </div>
+
+          </div>
+
+
+          <!-- ================================================= -->
+          <!-- Community users -->
+          <!-- ================================================= -->
+
+          <div
+            class="
+              col-12
+              col-md-4
+            "
+          >
+
+            <div
+              class="
+                card
+                border-0
+                shadow-sm
+                h-100
+              "
+            >
+              <div
+                class="
+                  card-body
+                  p-4
+                "
+              >
+
+                <div
+                  class="
+                    d-flex
+                    justify-content-between
+                    align-items-center
+                  "
+                >
+
+                  <div>
+
+                    <p
+                      class="
+                        text-muted
+                        mb-1
+                      "
+                    >
+                      Community Users
+                    </p>
+
+
+                    <p
+                      class="
+                        statistic-value
+                        fw-bold
+                        mb-0
+                      "
+                      aria-label="Total community users"
+                    >
+                      {{
+                        normalUsers
+                      }}
+                    </p>
+
+                  </div>
+
+
+                  <div
+                    class="
+                      fs-1
+                    "
+                    aria-hidden="true"
+                  >
+                    ♻️
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+
+          <!-- ================================================= -->
+          <!-- Administrators -->
+          <!-- ================================================= -->
+
+          <div
+            class="
+              col-12
+              col-md-4
+            "
+          >
+
+            <div
+              class="
+                card
+                border-0
+                shadow-sm
+                h-100
+              "
+            >
+              <div
+                class="
+                  card-body
+                  p-4
+                "
+              >
+
+                <div
+                  class="
+                    d-flex
+                    justify-content-between
+                    align-items-center
+                  "
+                >
+
+                  <div>
+
+                    <p
+                      class="
+                        text-muted
+                        mb-1
+                      "
+                    >
+                      Administrators
+                    </p>
+
+
+                    <p
+                      class="
+                        statistic-value
+                        fw-bold
+                        mb-0
+                      "
+                      aria-label="Total administrators"
+                    >
+                      {{
+                        adminUsers
+                      }}
+                    </p>
+
+                  </div>
+
+
+                  <div
+                    class="
+                      fs-1
+                    "
+                    aria-hidden="true"
+                  >
+                    🔐
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
           </div>
 
         </div>
 
-
-        <!-- Community users -->
-        <div class="col-12 col-md-4">
-
-          <div
-            class="
-              card
-              border-0
-              shadow-sm
-              h-100
-            "
-          >
-            <div class="card-body p-4">
-
-              <div
-                class="
-                  d-flex
-                  justify-content-between
-                  align-items-center
-                "
-              >
-
-                <div>
-                  <p class="text-muted mb-1">
-                    Community Users
-                  </p>
-
-                  <h2 class="fw-bold mb-0">
-                    {{ normalUsers }}
-                  </h2>
-                </div>
-
-                <div class="fs-1">
-                  ♻️
-                </div>
-
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-
-        <!-- Administrators -->
-        <div class="col-12 col-md-4">
-
-          <div
-            class="
-              card
-              border-0
-              shadow-sm
-              h-100
-            "
-          >
-            <div class="card-body p-4">
-
-              <div
-                class="
-                  d-flex
-                  justify-content-between
-                  align-items-center
-                "
-              >
-
-                <div>
-                  <p class="text-muted mb-1">
-                    Administrators
-                  </p>
-
-                  <h2 class="fw-bold mb-0">
-                    {{ adminUsers }}
-                  </h2>
-                </div>
-
-                <div class="fs-1">
-                  🔐
-                </div>
-
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-      </div>
+      </section>
 
 
       <!-- ================================================= -->
-      <!-- User table -->
+      <!-- Registered users -->
       <!-- ================================================= -->
 
-      <div
+      <section
         class="
           card
           border-0
           shadow-sm
         "
+        aria-labelledby="registered-users-title"
       >
 
-        <div class="card-body p-4">
+        <div
+          class="
+            card-body
+            p-4
+          "
+        >
+
+          <!-- ================================================= -->
+          <!-- Table heading -->
+          <!-- ================================================= -->
 
           <div
             class="
@@ -400,15 +623,32 @@ const formatDate =
           >
 
             <div>
-              <h2 class="h4 fw-bold mb-1">
+
+              <h2
+                id="registered-users-title"
+                class="
+                  h4
+                  fw-bold
+                  mb-1
+                "
+              >
                 Registered Users
               </h2>
 
-              <p class="text-muted mb-0">
-                Firebase authenticated users
-                with application profiles
-                stored in Cloud Firestore.
+
+              <p
+                id="registered-users-description"
+                class="
+                  text-muted
+                  mb-0
+                "
+              >
+                Firebase authenticated
+                users with application
+                profiles stored in
+                Cloud Firestore.
               </p>
+
             </div>
 
 
@@ -420,9 +660,19 @@ const formatDate =
                 px-3
                 py-2
               "
+              :aria-label="
+                `${totalUsers} registered accounts`
+              "
             >
-              {{ totalUsers }}
-              account(s)
+              {{
+                totalUsers
+              }}
+
+              {{
+                totalUsers === 1
+                  ? 'account'
+                  : 'accounts'
+              }}
             </span>
 
           </div>
@@ -433,29 +683,38 @@ const formatDate =
           <!-- ================================================= -->
 
           <div
-            v-if="isLoading"
+            v-if="
+              isLoading
+            "
             class="
               text-center
               py-5
             "
+            role="status"
             aria-live="polite"
+            aria-atomic="true"
           >
+
             <div
               class="
                 spinner-border
                 text-success
                 mb-3
               "
-              role="status"
-            >
-              <span class="visually-hidden">
-                Loading users
-              </span>
-            </div>
+              aria-hidden="true"
+            ></div>
 
-            <p class="text-muted mb-0">
-              Loading users from Firestore...
+
+            <p
+              class="
+                text-muted
+                mb-0
+              "
+            >
+              Loading users from
+              Firestore...
             </p>
+
           </div>
 
 
@@ -465,9 +724,16 @@ const formatDate =
 
           <div
             v-else-if="
-              users.length > 0
+              users.length >
+              0
             "
-            class="table-responsive"
+            class="
+              table-responsive
+            "
+            tabindex="0"
+            role="region"
+            aria-label="Registered users table. Scroll horizontally if required."
+            aria-describedby="registered-users-description"
           >
 
             <table
@@ -475,30 +741,68 @@ const formatDate =
                 table
                 align-middle
                 table-hover
+                mb-0
               "
             >
 
-              <thead class="table-light">
+              <!-- ============================================= -->
+              <!-- Accessible table caption -->
+              <!-- ============================================= -->
+
+              <caption
+                class="
+                  visually-hidden
+                "
+              >
+                Registered ZWV Circular
+                Hub users, including
+                username, email,
+                account role, join date
+                and Firebase UID.
+              </caption>
+
+
+              <thead
+                class="
+                  table-light
+                "
+              >
                 <tr>
-                  <th scope="col">
+
+                  <th
+                    scope="col"
+                  >
                     Username
                   </th>
 
-                  <th scope="col">
+
+                  <th
+                    scope="col"
+                  >
                     Email
                   </th>
 
-                  <th scope="col">
+
+                  <th
+                    scope="col"
+                  >
                     Role
                   </th>
 
-                  <th scope="col">
+
+                  <th
+                    scope="col"
+                  >
                     Joined
                   </th>
 
-                  <th scope="col">
+
+                  <th
+                    scope="col"
+                  >
                     Firebase UID
                   </th>
+
                 </tr>
               </thead>
 
@@ -506,23 +810,50 @@ const formatDate =
               <tbody>
 
                 <tr
-                  v-for="user in users"
-                  :key="user.id"
+                  v-for="
+                    user in
+                    users
+                  "
+                  :key="
+                    user.id
+                  "
                 >
 
-                  <!-- Username -->
-                  <td class="fw-semibold">
-                    {{ user.username }}
-                  </td>
+                  <!-- ========================================= -->
+                  <!-- Username / row heading -->
+                  <!-- ========================================= -->
+
+                  <th
+                    scope="row"
+                    class="
+                      fw-semibold
+                    "
+                  >
+                    {{
+                      user.username
+                    }}
+                  </th>
 
 
+                  <!-- ========================================= -->
                   <!-- Email -->
-                  <td>
-                    {{ user.email }}
+                  <!-- ========================================= -->
+
+                  <td
+                    class="
+                      text-break
+                    "
+                  >
+                    {{
+                      user.email
+                    }}
                   </td>
 
 
+                  <!-- ========================================= -->
                   <!-- Role -->
+                  <!-- ========================================= -->
+
                   <td>
 
                     <span
@@ -530,10 +861,14 @@ const formatDate =
                         user.role ===
                         'admin'
                       "
-                      class="badge bg-dark"
+                      class="
+                        badge
+                        bg-dark
+                      "
                     >
                       Admin
                     </span>
+
 
                     <span
                       v-else
@@ -548,8 +883,15 @@ const formatDate =
                   </td>
 
 
+                  <!-- ========================================= -->
                   <!-- Joined -->
-                  <td class="text-muted">
+                  <!-- ========================================= -->
+
+                  <td
+                    class="
+                      text-muted
+                    "
+                  >
                     {{
                       formatDate(
                         user.createdAt,
@@ -558,16 +900,23 @@ const formatDate =
                   </td>
 
 
+                  <!-- ========================================= -->
                   <!-- Firebase UID -->
+                  <!-- ========================================= -->
+
                   <td>
+
                     <code
                       class="
                         small
                         text-break
                       "
                     >
-                      {{ user.id }}
+                      {{
+                        user.id
+                      }}
                     </code>
+
                   </td>
 
                 </tr>
@@ -592,55 +941,196 @@ const formatDate =
               py-5
               px-3
             "
+            role="status"
+            aria-live="polite"
           >
-            <div class="fs-1 mb-3">
+
+            <div
+              class="
+                fs-1
+                mb-3
+              "
+              aria-hidden="true"
+            >
               👥
             </div>
 
-            <h3 class="h5 fw-bold">
+
+            <h3
+              class="
+                h5
+                fw-bold
+              "
+            >
               No users found
             </h3>
 
-            <p class="text-muted mb-0">
-              Registered Firebase users
-              will appear here after
-              their Firestore profiles
-              have been created.
+
+            <p
+              class="
+                text-muted
+                mb-0
+              "
+            >
+              Registered Firebase
+              users will appear here
+              after their Firestore
+              profiles have been
+              created.
             </p>
+
           </div>
 
         </div>
 
-      </div>
+      </section>
 
 
       <!-- ================================================= -->
       <!-- Security notice -->
       <!-- ================================================= -->
 
-      <div
+      <aside
         class="
           alert
           alert-success
           mt-4
           mb-0
         "
-        role="status"
+        aria-labelledby="admin-security-title"
       >
 
-        <strong>
-          🔐 Role-protected Firebase page
-        </strong>
+        <h2
+          id="admin-security-title"
+          class="
+            h6
+            fw-bold
+            mb-1
+          "
+        >
 
-        <div class="small mt-1">
-          This dashboard requires Firebase Authentication
-          and an administrator role stored in Cloud Firestore.
-          Firestore security rules will also enforce access
-          to protected user data.
-        </div>
+          <span
+            aria-hidden="true"
+          >
+            🔐
+          </span>
 
-      </div>
+          Role-protected Firebase page
+        </h2>
+
+
+        <p
+          class="
+            small
+            mb-0
+          "
+        >
+          This dashboard requires
+          Firebase Authentication and
+          an administrator role stored
+          in Cloud Firestore.
+
+          Firestore security rules also
+          enforce access to protected
+          user data.
+        </p>
+
+      </aside>
 
     </div>
   </main>
 </template>
+
+
+<style scoped>
+
+/* ===================================================== */
+/* Accessible colour helpers */
+/* ===================================================== */
+
+.admin-eyebrow {
+  color:
+    #146c43;
+}
+
+
+/*
+  Bootstrap muted text is slightly
+  light on some pale backgrounds.
+  A darker value gives more reliable
+  WCAG AA contrast.
+*/
+
+.text-muted {
+  color:
+    #495057 !important;
+}
+
+
+/* ===================================================== */
+/* Statistics */
+/* ===================================================== */
+
+.statistic-value {
+  font-size:
+    2rem;
+
+  line-height:
+    1.15;
+}
+
+
+/* ===================================================== */
+/* Table */
+/* ===================================================== */
+
+.table-responsive {
+  border-radius:
+    0.5rem;
+}
+
+
+/*
+  The responsive table can become
+  horizontally scrollable on narrow
+  screens.
+
+  tabindex="0" allows keyboard users
+  to focus and scroll this region.
+*/
+
+.table-responsive:focus-visible {
+  outline:
+    3px solid
+    #0b5d1e;
+
+  outline-offset:
+    4px;
+}
+
+
+/* ===================================================== */
+/* Firebase UID */
+/* ===================================================== */
+
+code {
+  color:
+    #343a40;
+}
+
+
+/* ===================================================== */
+/* Reduced motion */
+/* ===================================================== */
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+
+  .spinner-border {
+    animation:
+      none !important;
+  }
+
+}
+</style>

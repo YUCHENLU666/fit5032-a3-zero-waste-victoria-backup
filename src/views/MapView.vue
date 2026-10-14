@@ -210,7 +210,7 @@ const selectedCoordinates =
 
 
 // ======================================================
-// Clear messages
+// Messages
 // ======================================================
 
 function clearMessages() {
@@ -220,111 +220,60 @@ function clearMessages() {
 
 
 // ======================================================
-// Popup content
+// Visual map markers
+// ======================================================
+//
+// Every recycling location already appears as a proper,
+// keyboard-accessible button in the Search Results list.
+//
+// The pins on the Mapbox canvas therefore act as visual
+// duplicates rather than additional controls.
+//
+// This prevents dozens of closely packed map pins from
+// creating overlapping touch targets and an unnecessarily
+// long keyboard tab order.
+//
+// Users can:
+// - Search locations from the accessible list.
+// - Select a destination from the accessible list.
+// - Move the map to the selected destination.
+// - Use geolocation.
+// - Plan driving/walking/cycling routes.
 // ======================================================
 
-function createLocationPopup(
-  location,
-) {
-  const wrapper =
-    document.createElement(
-      'div',
-    )
-
-  wrapper.className =
-    'zwv-popup'
-
-
-  const title =
-    document.createElement(
-      'strong',
-    )
-
-  title.textContent =
-    location.name
-
-
-  const suburb =
-    document.createElement(
-      'div',
-    )
-
-  suburb.textContent =
-    `${location.suburb} ${location.postcode}`
-
-
-  const materials =
-    document.createElement(
-      'div',
-    )
-
-  materials.textContent =
-    location.acceptedMaterials
-      .join(', ')
-
-
-  const status =
-    document.createElement(
-      'div',
-    )
-
-  status.textContent =
-    `Status: ${location.status}`
-
-
-  wrapper.append(
-    title,
-    suburb,
-    materials,
-    status,
-  )
-
-
-  return wrapper
-}
-
-
-// ======================================================
-// Marker accessibility
-// ======================================================
-
-function configureMarkerAccessibility({
+function configureMarkerAsVisualDuplicate(
   marker,
-  label,
-  onKeyboardActivate,
-}) {
+) {
   const element =
     marker.getElement()
 
   element.setAttribute(
-    'role',
-    'button',
+    'aria-hidden',
+    'true',
   )
 
   element.setAttribute(
     'tabindex',
-    '0',
+    '-1',
   )
 
-  element.setAttribute(
+  element.removeAttribute(
+    'role',
+  )
+
+  element.removeAttribute(
     'aria-label',
-    label,
   )
 
-
-  element.addEventListener(
-    'keydown',
-    (event) => {
-      if (
-        event.key === 'Enter' ||
-        event.key === ' '
-      ) {
-        event.preventDefault()
-
-        onKeyboardActivate()
-      }
-    },
+  element.removeAttribute(
+    'aria-expanded',
   )
+
+  // Marker is visual only.
+  // All destination interaction occurs through
+  // the accessible Search Results buttons.
+  element.style.pointerEvents =
+    'none'
 }
 
 
@@ -337,21 +286,8 @@ function addLocationMarkers() {
     return
   }
 
-
   recyclingLocations.forEach(
     (location) => {
-
-      const popup =
-        new mapboxgl.Popup({
-          offset: 24,
-        })
-          .setDOMContent(
-            createLocationPopup(
-              location,
-            ),
-          )
-
-
       const marker =
         new mapboxgl.Marker({
           color:
@@ -364,55 +300,13 @@ function addLocationMarkers() {
             location.longitude,
             location.latitude,
           ])
-          .setPopup(
-            popup,
-          )
           .addTo(
             map,
           )
 
-
-      // --------------------------------------------------
-      // Mouse click
-      //
-      // Mapbox handles popup opening automatically.
-      // We only update Vue state here.
-      // --------------------------------------------------
-
-      marker
-        .getElement()
-        .addEventListener(
-          'click',
-          () => {
-            selectLocation(
-              location,
-              false,
-              false,
-            )
-          },
-        )
-
-
-      // --------------------------------------------------
-      // Keyboard
-      // --------------------------------------------------
-
-      configureMarkerAccessibility({
+      configureMarkerAsVisualDuplicate(
         marker,
-
-        label:
-          `Select ${location.name}, ${location.suburb}, ${location.status}`,
-
-        onKeyboardActivate:
-          () => {
-            selectLocation(
-              location,
-              false,
-              true,
-            )
-          },
-      })
-
+      )
 
       locationMarkers.set(
         location.id,
@@ -430,10 +324,8 @@ function addLocationMarkers() {
 function selectLocation(
   location,
   moveMap = true,
-  openPopup = true,
 ) {
   clearMessages()
-
 
   selectedLocation.value =
     location
@@ -442,11 +334,6 @@ function selectLocation(
     null
 
   clearRoute()
-
-
-  // --------------------------------------------------
-  // Move map
-  // --------------------------------------------------
 
   if (
     moveMap &&
@@ -464,27 +351,6 @@ function selectLocation(
     })
   }
 
-
-  // --------------------------------------------------
-  // Popup
-  // --------------------------------------------------
-
-  const marker =
-    locationMarkers.get(
-      location.id,
-    )
-
-  if (
-    openPopup &&
-    marker &&
-    !marker
-      .getPopup()
-      .isOpen()
-  ) {
-    marker.togglePopup()
-  }
-
-
   statusMessage.value =
     `${location.name} selected as the destination.`
 }
@@ -500,61 +366,17 @@ async function handleUseMyLocation() {
   isLocating.value =
     true
 
-
   try {
     const location =
       await getCurrentLocation()
 
-
     userLocation.value =
       location
 
-
-    // Remove previous user marker.
     if (userMarker) {
       userMarker.remove()
+      userMarker = null
     }
-
-
-    // --------------------------------------------------
-    // User popup content
-    // --------------------------------------------------
-
-    const popupContent =
-      document.createElement(
-        'div',
-      )
-
-
-    const title =
-      document.createElement(
-        'strong',
-      )
-
-    title.textContent =
-      'Your Location'
-
-
-    const accuracy =
-      document.createElement(
-        'div',
-      )
-
-    accuracy.textContent =
-      `Accuracy: approximately ${Math.round(
-        location.accuracy,
-      )} m`
-
-
-    popupContent.append(
-      title,
-      accuracy,
-    )
-
-
-    // --------------------------------------------------
-    // User marker
-    // --------------------------------------------------
 
     userMarker =
       new mapboxgl.Marker({
@@ -565,41 +387,13 @@ async function handleUseMyLocation() {
           location.longitude,
           location.latitude,
         ])
-        .setPopup(
-          new mapboxgl.Popup({
-            offset: 24,
-          })
-            .setDOMContent(
-              popupContent,
-            ),
-        )
         .addTo(
           map,
         )
 
-
-    // --------------------------------------------------
-    // User marker accessibility
-    // --------------------------------------------------
-
-    configureMarkerAccessibility({
-      marker:
-        userMarker,
-
-      label:
-        'Your current location',
-
-      onKeyboardActivate:
-        () => {
-          userMarker
-            ?.togglePopup()
-        },
-    })
-
-
-    // --------------------------------------------------
-    // Move map
-    // --------------------------------------------------
+    configureMarkerAsVisualDuplicate(
+      userMarker,
+    )
 
     moveMapTo({
       longitude:
@@ -612,10 +406,8 @@ async function handleUseMyLocation() {
         13,
     })
 
-
     statusMessage.value =
       'Your current location has been added to the map.'
-
 
     routeInfo.value =
       null
@@ -638,7 +430,7 @@ async function handleUseMyLocation() {
 
 
 // ======================================================
-// Route layer
+// Clear route
 // ======================================================
 
 function clearRoute() {
@@ -649,7 +441,6 @@ function clearRoute() {
     return
   }
 
-
   if (
     map.getLayer(
       ROUTE_LAYER_ID,
@@ -659,7 +450,6 @@ function clearRoute() {
       ROUTE_LAYER_ID,
     )
   }
-
 
   if (
     map.getSource(
@@ -687,9 +477,7 @@ function drawRoute(
     return
   }
 
-
   clearRoute()
-
 
   map.addSource(
     ROUTE_SOURCE_ID,
@@ -708,7 +496,6 @@ function drawRoute(
       },
     },
   )
-
 
   map.addLayer({
     id:
@@ -756,10 +543,8 @@ function fitMapToRoute(
     return
   }
 
-
   const coordinates =
     geometry.coordinates
-
 
   if (
     coordinates.length ===
@@ -767,7 +552,6 @@ function fitMapToRoute(
   ) {
     return
   }
-
 
   const bounds =
     coordinates.reduce(
@@ -785,7 +569,6 @@ function fitMapToRoute(
         coordinates[0],
       ),
     )
-
 
   map.fitBounds(
     bounds,
@@ -812,7 +595,6 @@ function fitMapToRoute(
 async function handlePlanRoute() {
   clearMessages()
 
-
   // --------------------------------------------------
   // Require user location
   // --------------------------------------------------
@@ -825,7 +607,6 @@ async function handlePlanRoute() {
 
     return
   }
-
 
   // --------------------------------------------------
   // Require destination
@@ -840,10 +621,8 @@ async function handlePlanRoute() {
     return
   }
 
-
   isRouting.value =
     true
-
 
   try {
     const route =
@@ -872,20 +651,16 @@ async function handlePlanRoute() {
           travelMode.value,
       })
 
-
     routeInfo.value =
       route
-
 
     drawRoute(
       route.geometry,
     )
 
-
     fitMapToRoute(
       route.geometry,
     )
-
 
     statusMessage.value =
       `Route to ${selectedLocation.value.name} calculated successfully.`
@@ -912,7 +687,6 @@ async function handlePlanRoute() {
 function clearSelection() {
   clearMessages()
 
-
   selectedLocation.value =
     null
 
@@ -922,9 +696,7 @@ function clearSelection() {
   searchTerm.value =
     ''
 
-
   clearRoute()
-
 
   statusMessage.value =
     'Destination selection cleared.'
@@ -937,7 +709,6 @@ function clearSelection() {
 
 onMounted(
   async () => {
-
     if (
       !isMapboxConfigured()
     ) {
@@ -947,13 +718,19 @@ onMounted(
       return
     }
 
-
     mapboxgl.accessToken =
       MAPBOX_ACCESS_TOKEN
 
-
     await nextTick()
 
+    if (
+      !mapContainer.value
+    ) {
+      errorMessage.value =
+        'Unable to initialise the map container.'
+
+      return
+    }
 
     map =
       new mapboxgl.Map({
@@ -972,7 +749,6 @@ onMounted(
           10.5,
       })
 
-
     // --------------------------------------------------
     // Navigation controls
     // --------------------------------------------------
@@ -982,7 +758,6 @@ onMounted(
 
       'top-right',
     )
-
 
     // --------------------------------------------------
     // Scale
@@ -1000,7 +775,6 @@ onMounted(
       'bottom-left',
     )
 
-
     // --------------------------------------------------
     // Map ready
     // --------------------------------------------------
@@ -1014,6 +788,17 @@ onMounted(
         addLocationMarkers()
       },
     )
+
+    map.on(
+      'error',
+      (event) => {
+        console.error(
+          'Mapbox error:',
+          event?.error ||
+          event,
+        )
+      },
+    )
   },
 )
 
@@ -1024,27 +809,26 @@ onMounted(
 
 onUnmounted(
   () => {
-
     locationMarkers.forEach(
       (marker) => {
         marker.remove()
       },
     )
 
-
     locationMarkers.clear()
-
 
     if (userMarker) {
       userMarker.remove()
       userMarker = null
     }
 
-
     if (map) {
       map.remove()
       map = null
     }
+
+    mapReady.value =
+      false
   },
 )
 </script>
@@ -1208,9 +992,7 @@ onUnmounted(
               <!-- POI search -->
               <!-- ============================================= -->
 
-              <div
-                class="mb-4"
-              >
+              <div class="mb-4">
 
                 <label
                   for="poi-search"
@@ -1246,9 +1028,11 @@ onUnmounted(
                   "
                 >
                   Search across all
+
                   {{
                     recyclingLocations.length
                   }}
+
                   recycling points.
                 </div>
 
@@ -1293,7 +1077,12 @@ onUnmounted(
                   {{
                     filteredLocations.length
                   }}
-                  location(s)
+
+                  {{
+                    filteredLocations.length === 1
+                      ? 'location'
+                      : 'locations'
+                  }}
                 </p>
 
 
@@ -1478,6 +1267,7 @@ onUnmounted(
                     location-success
                     mt-2
                   "
+                  role="status"
                 >
                   <small
                     class="
@@ -1805,11 +1595,7 @@ onUnmounted(
                 "
               >
 
-                <div
-                  class="
-                    col-6
-                  "
-                >
+                <div class="col-6">
 
                   <div
                     class="
@@ -1844,11 +1630,7 @@ onUnmounted(
                 </div>
 
 
-                <div
-                  class="
-                    col-6
-                  "
-                >
+                <div class="col-6">
 
                   <div
                     class="
@@ -1917,26 +1699,20 @@ onUnmounted(
             "
           >
 
-            <!--
-              Screen-reader text alternative.
-            -->
-
             <p
               id="map-accessibility-description"
               class="
                 visually-hidden
               "
             >
-              The interactive map
-              visually displays
-              recycling locations and
-              calculated routes.
+              The interactive map visually displays
+              recycling locations, your current
+              location and calculated routes.
 
-              All recycling destinations
-              can also be searched and
-              selected from the
-              accessible location list
-              beside the map.
+              Every recycling destination can also
+              be searched and selected using the
+              keyboard-accessible Search Results
+              list beside the map.
             </p>
 
 
@@ -1948,9 +1724,7 @@ onUnmounted(
             >
 
               <div
-                ref="
-                  mapContainer
-                "
+                ref="mapContainer"
                 class="
                   map-container
                 "
@@ -2122,12 +1896,18 @@ onUnmounted(
 
   overflow-y:
     auto;
+
+  padding-right:
+    0.25rem;
 }
 
 
 .location-result {
   width:
     100%;
+
+  min-height:
+    52px;
 
   padding:
     0.75rem 0.9rem;
@@ -2154,7 +1934,7 @@ onUnmounted(
     #f7fbf8;
 
   border-color:
-    var(--bs-success);
+    #146c43;
 
   transform:
     translateY(-1px);
@@ -2164,7 +1944,7 @@ onUnmounted(
 .location-result:focus-visible {
   outline:
     3px solid
-    #198754;
+    #0b5d1e;
 
   outline-offset:
     3px;
@@ -2174,14 +1954,14 @@ onUnmounted(
 .location-result.selected {
   background-color:
     rgba(
-      25,
-      135,
-      84,
+      20,
+      108,
+      67,
       0.08
     );
 
   border-color:
-    var(--bs-success);
+    #146c43;
 }
 
 
@@ -2198,6 +1978,9 @@ onUnmounted(
 
   gap:
     0.75rem;
+
+  min-height:
+    48px;
 
   padding:
     0.7rem 0.9rem;
@@ -2220,37 +2003,27 @@ onUnmounted(
 .travel-option.active {
   background-color:
     rgba(
-      25,
-      135,
-      84,
+      20,
+      108,
+      67,
       0.08
     );
 
   border-color:
-    var(--bs-success);
+    #146c43;
 }
 
 
 .travel-option input {
   accent-color:
-    var(--bs-success);
+    #146c43;
 }
 
 
-/*
-  IMPORTANT:
-  The pseudo-class must remain
-  together as :focus-within.
-*/
 .travel-option:focus-within {
   outline:
     3px solid
-    rgba(
-      25,
-      135,
-      84,
-      0.35
-    );
+    #0b5d1e;
 
   outline-offset:
     2px;
@@ -2263,7 +2036,7 @@ onUnmounted(
 
 .section-label {
   color:
-    var(--bs-success);
+    #146c43;
 
   font-size:
     0.72rem;
@@ -2315,6 +2088,9 @@ onUnmounted(
 
   font-weight:
     500;
+
+  overflow-wrap:
+    anywhere;
 }
 
 
@@ -2377,33 +2153,45 @@ onUnmounted(
 
 
 /*
-  Mapbox controls and markers
-  are dynamically inserted.
-
-  Keep these :deep selectors
-  on ONE selector expression.
+  Mapbox creates these elements dynamically,
+  so :deep() is required inside scoped CSS.
 */
 
 :deep(.mapboxgl-ctrl button:focus-visible) {
   outline:
     3px solid
-    #198754;
+    #0b5d1e;
 
   outline-offset:
     3px;
 }
 
 
-:deep(.mapboxgl-marker:focus-visible) {
-  outline:
-    3px solid
-    #198754;
+/*
+  Give built-in Mapbox navigation controls
+  comfortable touch targets.
+*/
 
-  outline-offset:
-    3px;
+:deep(.mapboxgl-ctrl-group button) {
+  width:
+    44px;
 
-  border-radius:
-    50%;
+  height:
+    44px;
+}
+
+
+/*
+  Recycling markers are visual duplicates of the
+  keyboard-accessible location buttons.
+
+  They intentionally do not act as independent
+  touch or keyboard controls.
+*/
+
+:deep(.mapboxgl-marker) {
+  pointer-events:
+    none;
 }
 
 
@@ -2429,6 +2217,9 @@ onUnmounted(
 
   padding:
     0.7rem 0.9rem;
+
+  color:
+    #212529;
 
   font-size:
     0.8rem;
@@ -2519,16 +2310,26 @@ onUnmounted(
 
 .form-control:focus {
   border-color:
-    var(--bs-success);
+    #146c43;
 
   box-shadow:
     0 0 0 0.2rem
     rgba(
-      25,
-      135,
-      84,
-      0.15
+      20,
+      108,
+      67,
+      0.18
     );
+}
+
+
+/* ===================================================== */
+/* Buttons */
+/* ===================================================== */
+
+.btn {
+  min-height:
+    44px;
 }
 
 
@@ -2588,5 +2389,18 @@ onUnmounted(
       0.15rem;
   }
 
+
+  .map-legend {
+    left:
+      0.75rem;
+
+    bottom:
+      2rem;
+
+    font-size:
+      0.75rem;
+  }
+
 }
+
 </style>

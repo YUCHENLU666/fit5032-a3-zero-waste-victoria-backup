@@ -14,9 +14,17 @@ import {
   subscribeToAuthState,
 } from '../services/authService'
 
-const router = useRouter()
 
-const currentUser = ref(null)
+const router =
+  useRouter()
+
+
+const currentUser =
+  ref(null)
+
+
+const logoutError =
+  ref('')
 
 
 // ======================================================
@@ -51,15 +59,23 @@ onUnmounted(() => {
 
 const handleLogout =
   async () => {
+    logoutError.value =
+      ''
+
     try {
       await logoutUser()
 
-      await router.push('/')
+      await router.push(
+        '/',
+      )
     } catch (error) {
       console.error(
         'Logout failed:',
         error,
       )
+
+      logoutError.value =
+        'Unable to log out. Please try again.'
     }
   }
 </script>
@@ -77,36 +93,68 @@ const handleLogout =
     "
     aria-label="Main navigation"
   >
-    <div class="container">
+    <div
+      class="container"
+    >
 
+      <!-- ================================================= -->
       <!-- Brand -->
+      <!-- ================================================= -->
+
       <RouterLink
-        class="navbar-brand fw-bold"
+        class="
+          navbar-brand
+          fw-bold
+        "
         to="/"
+        aria-label="ZWV Circular Hub home"
       >
-        ♻ ZWV Circular Hub
+        <span
+          aria-hidden="true"
+        >
+          ♻
+        </span>
+
+        <span>
+          ZWV Circular Hub
+        </span>
       </RouterLink>
 
 
-      <!-- Mobile navigation -->
+      <!-- ================================================= -->
+      <!-- Mobile navigation toggle -->
+      <!-- ================================================= -->
+
       <button
-        class="navbar-toggler"
+        class="
+          navbar-toggler
+        "
         type="button"
         data-bs-toggle="collapse"
         data-bs-target="#mainNavbar"
         aria-controls="mainNavbar"
         aria-expanded="false"
-        aria-label="Toggle navigation"
+        aria-label="Toggle main navigation"
       >
         <span
-          class="navbar-toggler-icon"
+          class="
+            navbar-toggler-icon
+          "
+          aria-hidden="true"
         ></span>
       </button>
 
 
+      <!-- ================================================= -->
+      <!-- Main navigation links -->
+      <!-- ================================================= -->
+
       <div
         id="mainNavbar"
-        class="collapse navbar-collapse"
+        class="
+          collapse
+          navbar-collapse
+        "
       >
         <ul
           class="
@@ -120,10 +168,13 @@ const handleLogout =
           <!-- Public navigation -->
           <!-- ================================================= -->
 
-          <!-- Home -->
-          <li class="nav-item">
+          <li
+            class="nav-item"
+          >
             <RouterLink
-              class="nav-link"
+              class="
+                nav-link
+              "
               to="/"
             >
               Home
@@ -131,10 +182,13 @@ const handleLogout =
           </li>
 
 
-          <!-- Recycling Finder -->
-          <li class="nav-item">
+          <li
+            class="nav-item"
+          >
             <RouterLink
-              class="nav-link"
+              class="
+                nav-link
+              "
               to="/recycle"
             >
               Recycle & Reuse
@@ -142,10 +196,13 @@ const handleLogout =
           </li>
 
 
-          <!-- Interactive Data Explorer -->
-          <li class="nav-item">
+          <li
+            class="nav-item"
+          >
             <RouterLink
-              class="nav-link"
+              class="
+                nav-link
+              "
               to="/data-explorer"
             >
               Data Explorer
@@ -153,10 +210,13 @@ const handleLogout =
           </li>
 
 
-          <!-- Recycling Map -->
-          <li class="nav-item">
+          <li
+            class="nav-item"
+          >
             <RouterLink
-              class="nav-link"
+              class="
+                nav-link
+              "
               to="/map"
             >
               Recycling Map
@@ -169,12 +229,18 @@ const handleLogout =
           <!-- ================================================= -->
 
           <template
-            v-if="!currentUser"
+            v-if="
+              !currentUser
+            "
           >
-            <!-- Login -->
-            <li class="nav-item">
+
+            <li
+              class="nav-item"
+            >
               <RouterLink
-                class="nav-link"
+                class="
+                  nav-link
+                "
                 to="/login"
               >
                 Login
@@ -182,9 +248,11 @@ const handleLogout =
             </li>
 
 
-            <!-- Register -->
             <li
-              class="nav-item ms-lg-2"
+              class="
+                nav-item
+                ms-lg-2
+              "
             >
               <RouterLink
                 class="
@@ -199,6 +267,7 @@ const handleLogout =
                 Register
               </RouterLink>
             </li>
+
           </template>
 
 
@@ -208,10 +277,13 @@ const handleLogout =
 
           <template v-else>
 
-            <!-- Email -->
-            <li class="nav-item">
+            <li
+              class="nav-item"
+            >
               <RouterLink
-                class="nav-link"
+                class="
+                  nav-link
+                "
                 to="/email"
               >
                 Email
@@ -220,6 +292,7 @@ const handleLogout =
 
 
             <!-- Admin only -->
+
             <li
               v-if="
                 currentUser.role ===
@@ -228,7 +301,9 @@ const handleLogout =
               class="nav-item"
             >
               <RouterLink
-                class="nav-link"
+                class="
+                  nav-link
+                "
                 to="/admin"
               >
                 Admin
@@ -236,10 +311,13 @@ const handleLogout =
             </li>
 
 
-            <!-- Account -->
-            <li class="nav-item">
+            <li
+              class="nav-item"
+            >
               <RouterLink
-                class="nav-link"
+                class="
+                  nav-link
+                "
                 to="/account"
               >
                 My Account
@@ -247,25 +325,45 @@ const handleLogout =
             </li>
 
 
-            <!-- Username -->
-            <li class="nav-item">
+            <!-- ================================================= -->
+            <!-- Current signed-in user -->
+            <!-- ================================================= -->
+
+            <li
+              class="nav-item"
+            >
               <span
                 class="
                   nav-link
                   text-success
                   fw-semibold
                 "
-                aria-label="Current signed-in user"
               >
+                <span
+                  class="
+                    visually-hidden
+                  "
+                >
+                  Current signed-in user:
+                </span>
+
                 Hi,
-                {{ currentUser.username }}
+                {{
+                  currentUser.username
+                }}
               </span>
             </li>
 
 
+            <!-- ================================================= -->
             <!-- Logout -->
+            <!-- ================================================= -->
+
             <li
-              class="nav-item ms-lg-2"
+              class="
+                nav-item
+                ms-lg-2
+              "
             >
               <button
                 type="button"
@@ -276,7 +374,9 @@ const handleLogout =
                   mt-2
                   mt-lg-0
                 "
-                @click="handleLogout"
+                @click="
+                  handleLogout
+                "
               >
                 Logout
               </button>
@@ -285,6 +385,26 @@ const handleLogout =
           </template>
 
         </ul>
+      </div>
+
+
+      <!-- ================================================= -->
+      <!-- Logout error -->
+      <!-- ================================================= -->
+
+      <div
+        v-if="
+          logoutError
+        "
+        class="
+          visually-hidden
+        "
+        role="alert"
+        aria-live="assertive"
+      >
+        {{
+          logoutError
+        }}
       </div>
 
     </div>

@@ -18,10 +18,14 @@
   padding:
     0.75rem 1rem;
 
-  color: #ffffff;
+  color:
+    #ffffff;
 
-  font-weight: 700;
-  text-decoration: none;
+  font-weight:
+    700;
+
+  text-decoration:
+    none;
 
   background-color:
     #0b5d1e;
@@ -52,7 +56,8 @@
     translateY(0);
 
   outline:
-    3px solid #ffffff;
+    3px solid
+    #ffffff;
 
   outline-offset:
     3px;
@@ -70,7 +75,8 @@ select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
   outline:
-    3px solid #0b5d1e;
+    3px solid
+    #0b5d1e;
 
   outline-offset:
     3px;
@@ -90,7 +96,8 @@ textarea:focus-visible,
 */
 
 h1[tabindex='-1']:focus {
-  outline: none;
+  outline:
+    none;
 }
 
 
@@ -104,6 +111,82 @@ main a:not(.btn) {
 
   text-underline-offset:
     0.15em;
+}
+
+
+/* ===================================================== */
+/* Accessible text contrast */
+/* ===================================================== */
+
+/*
+  Bootstrap's default secondary, muted and success colours
+  can be slightly too light on pale page backgrounds.
+
+  These darker colours provide more reliable WCAG 2.1 AA
+  contrast while preserving the original visual style.
+*/
+
+.text-secondary,
+.text-muted {
+  color:
+    #495057 !important;
+}
+
+
+.text-success {
+  color:
+    #146c43 !important;
+}
+
+
+/* ===================================================== */
+/* Accessible form help text */
+/* ===================================================== */
+
+/*
+  Bootstrap form-text can appear slightly light,
+  especially on pale green or grey backgrounds.
+*/
+
+.form-text {
+  color:
+    #495057;
+}
+
+
+/* ===================================================== */
+/* Accessible placeholder contrast */
+/* ===================================================== */
+
+/*
+  Keep placeholders visible enough without making them
+  compete visually with entered text.
+*/
+
+::placeholder {
+  color:
+    #6c757d;
+
+  opacity:
+    1;
+}
+
+
+/* ===================================================== */
+/* Disabled controls */
+/* ===================================================== */
+
+/*
+  Disabled controls remain visually distinct while
+  preserving readable text.
+*/
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity:
+    0.7;
 }
 
 
@@ -137,4 +220,43 @@ main a:not(.btn) {
     transition-delay:
       0ms !important;
   }
+}
+
+/* ===================================================== */
+/* Accessible Bootstrap success buttons */
+/* ===================================================== */
+
+.btn-outline-success {
+  --bs-btn-color:
+    #146c43;
+
+  --bs-btn-border-color:
+    #146c43;
+
+  --bs-btn-hover-color:
+    #ffffff;
+
+  --bs-btn-hover-bg:
+    #146c43;
+
+  --bs-btn-hover-border-color:
+    #146c43;
+
+  --bs-btn-focus-shadow-rgb:
+    20, 108, 67;
+
+  --bs-btn-active-color:
+    #ffffff;
+
+  --bs-btn-active-bg:
+    #146c43;
+
+  --bs-btn-active-border-color:
+    #146c43;
+
+  --bs-btn-disabled-color:
+    #146c43;
+
+  --bs-btn-disabled-border-color:
+    #146c43;
 }

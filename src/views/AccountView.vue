@@ -31,7 +31,8 @@ const account =
 const unsubscribe =
   subscribeToAuthState(
     (user) => {
-      account.value = user
+      account.value =
+        user
     },
   )
 
@@ -50,6 +51,7 @@ const joinedDate =
     const createdAt =
       account.value?.createdAt
 
+
     if (!createdAt) {
       return 'Not available'
     }
@@ -58,11 +60,14 @@ const joinedDate =
     // Support both:
     // 1. ISO date strings
     // 2. Firestore Timestamp objects
+
     const date =
       typeof createdAt?.toDate ===
       'function'
         ? createdAt.toDate()
-        : new Date(createdAt)
+        : new Date(
+            createdAt,
+          )
 
 
     if (
@@ -77,9 +82,14 @@ const joinedDate =
     return date.toLocaleDateString(
       'en-AU',
       {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+        day:
+          '2-digit',
+
+        month:
+          'short',
+
+        year:
+          'numeric',
       },
     )
   })
@@ -102,17 +112,32 @@ const roleLabel =
 
 
 <template>
-  <main class="bg-light py-5">
-    <div class="container">
+  <main
+    class="
+      bg-light
+      py-5
+    "
+    aria-labelledby="account-page-title"
+  >
+    <div
+      class="
+        container
+      "
+    >
 
       <!-- ================================================= -->
       <!-- Page header -->
       <!-- ================================================= -->
 
-      <div class="mb-4">
+      <header
+        class="
+          mb-4
+        "
+      >
+
         <p
           class="
-            text-success
+            account-eyebrow
             fw-semibold
             mb-2
           "
@@ -120,15 +145,33 @@ const roleLabel =
           MY ACCOUNT
         </p>
 
-        <h1 class="fw-bold mb-2">
+
+        <h1
+          id="account-page-title"
+          class="
+            fw-bold
+            mb-2
+          "
+        >
           Welcome,
-          {{ account?.username }}
+          {{
+            account?.username ||
+            'Member'
+          }}
         </h1>
 
-        <p class="text-muted mb-0">
-          View your ZWV Circular Hub account information.
+
+        <p
+          class="
+            text-muted
+            mb-0
+          "
+        >
+          View your ZWV Circular Hub
+          account information.
         </p>
-      </div>
+
+      </header>
 
 
       <!-- ================================================= -->
@@ -136,15 +179,26 @@ const roleLabel =
       <!-- ================================================= -->
 
       <div
-        v-if="account"
-        class="row g-4"
+        v-if="
+          account
+        "
+        class="
+          row
+          g-4
+        "
       >
 
         <!-- ================================================= -->
         <!-- Account information -->
         <!-- ================================================= -->
 
-        <div class="col-12 col-lg-8">
+        <section
+          class="
+            col-12
+            col-lg-8
+          "
+          aria-labelledby="account-details-title"
+        >
 
           <div
             class="
@@ -154,150 +208,163 @@ const roleLabel =
               h-100
             "
           >
-            <div class="card-body p-4">
+            <div
+              class="
+                card-body
+                p-4
+              "
+            >
 
-              <h2 class="h4 fw-bold mb-4">
+              <h2
+                id="account-details-title"
+                class="
+                  h4
+                  fw-bold
+                  mb-4
+                "
+              >
                 Account Details
               </h2>
 
 
-              <!-- Username -->
-              <div
+              <!-- =========================================== -->
+              <!-- Semantic definition list -->
+              <!-- =========================================== -->
+
+              <dl
                 class="
-                  row
-                  py-3
-                  border-bottom
+                  account-details
+                  mb-0
                 "
               >
-                <div
-                  class="
-                    col-5
-                    text-muted
-                  "
-                >
-                  Username
-                </div>
+
+                <!-- Username -->
 
                 <div
                   class="
-                    col-7
-                    fw-semibold
+                    account-detail-row
+                    border-bottom
                   "
                 >
-                  {{ account.username }}
+                  <dt>
+                    Username
+                  </dt>
+
+                  <dd>
+                    {{
+                      account.username
+                    }}
+                  </dd>
                 </div>
-              </div>
 
 
-              <!-- Email -->
-              <div
-                class="
-                  row
-                  py-3
-                  border-bottom
-                "
-              >
-                <div
-                  class="
-                    col-5
-                    text-muted
-                  "
-                >
-                  Email
-                </div>
+                <!-- Email -->
 
                 <div
                   class="
-                    col-7
-                    fw-semibold
-                    text-break
+                    account-detail-row
+                    border-bottom
                   "
                 >
-                  {{ account.email }}
-                </div>
-              </div>
+                  <dt>
+                    Email
+                  </dt>
 
-
-              <!-- Role -->
-              <div
-                class="
-                  row
-                  py-3
-                  border-bottom
-                "
-              >
-                <div
-                  class="
-                    col-5
-                    text-muted
-                  "
-                >
-                  Account Type
-                </div>
-
-                <div class="col-7">
-
-                  <span
-                    v-if="
-                      account.role ===
-                      'admin'
-                    "
-                    class="badge bg-dark"
-                  >
-                    {{ roleLabel }}
-                  </span>
-
-                  <span
-                    v-else
+                  <dd
                     class="
-                      badge
-                      bg-success
+                      text-break
                     "
                   >
-                    {{ roleLabel }}
-                  </span>
-
+                    {{
+                      account.email
+                    }}
+                  </dd>
                 </div>
-              </div>
 
 
-              <!-- Member since -->
-              <div
-                class="
-                  row
-                  py-3
-                "
-              >
-                <div
-                  class="
-                    col-5
-                    text-muted
-                  "
-                >
-                  Member Since
-                </div>
+                <!-- Role -->
 
                 <div
                   class="
-                    col-7
-                    fw-semibold
+                    account-detail-row
+                    border-bottom
                   "
                 >
-                  {{ joinedDate }}
+                  <dt>
+                    Account Type
+                  </dt>
+
+                  <dd>
+
+                    <span
+                      v-if="
+                        account.role ===
+                        'admin'
+                      "
+                      class="
+                        badge
+                        bg-dark
+                      "
+                    >
+                      {{
+                        roleLabel
+                      }}
+                    </span>
+
+
+                    <span
+                      v-else
+                      class="
+                        badge
+                        bg-success
+                      "
+                    >
+                      {{
+                        roleLabel
+                      }}
+                    </span>
+
+                  </dd>
                 </div>
-              </div>
+
+
+                <!-- Member since -->
+
+                <div
+                  class="
+                    account-detail-row
+                  "
+                >
+                  <dt>
+                    Member Since
+                  </dt>
+
+                  <dd>
+                    {{
+                      joinedDate
+                    }}
+                  </dd>
+                </div>
+
+              </dl>
 
             </div>
           </div>
 
-        </div>
+        </section>
 
 
         <!-- ================================================= -->
         <!-- Authentication status -->
         <!-- ================================================= -->
 
-        <div class="col-12 col-lg-4">
+        <section
+          class="
+            col-12
+            col-lg-4
+          "
+          aria-labelledby="account-access-title"
+        >
 
           <div
             class="
@@ -307,90 +374,178 @@ const roleLabel =
               h-100
             "
           >
-            <div class="card-body p-4">
+            <div
+              class="
+                card-body
+                p-4
+              "
+            >
 
-              <h2 class="h5 fw-bold mb-4">
+              <h2
+                id="account-access-title"
+                class="
+                  h5
+                  fw-bold
+                  mb-4
+                "
+              >
                 Account Access
               </h2>
 
 
-              <!-- Signed in -->
+              <!-- =========================================== -->
+              <!-- Firebase signed in -->
+              <!-- =========================================== -->
+
               <div
                 class="
                   d-flex
-                  align-items-center
+                  align-items-start
                   mb-4
                 "
               >
-                <span class="fs-4 me-3">
+
+                <span
+                  class="
+                    fs-4
+                    me-3
+                  "
+                  aria-hidden="true"
+                >
                   ✅
                 </span>
 
+
                 <div>
-                  <div class="fw-semibold">
+
+                  <div
+                    class="
+                      fw-semibold
+                    "
+                  >
                     Firebase Signed In
                   </div>
 
-                  <small class="text-muted">
-                    Your identity is authenticated
-                    using Firebase Authentication.
+
+                  <small
+                    class="
+                      text-muted
+                    "
+                  >
+                    Your identity is
+                    authenticated using
+                    Firebase
+                    Authentication.
                   </small>
+
                 </div>
+
               </div>
 
 
+              <!-- =========================================== -->
               <!-- Protected route -->
+              <!-- =========================================== -->
+
               <div
                 class="
                   d-flex
-                  align-items-center
+                  align-items-start
                   mb-4
                 "
               >
-                <span class="fs-4 me-3">
+
+                <span
+                  class="
+                    fs-4
+                    me-3
+                  "
+                  aria-hidden="true"
+                >
                   🔐
                 </span>
 
+
                 <div>
-                  <div class="fw-semibold">
+
+                  <div
+                    class="
+                      fw-semibold
+                    "
+                  >
                     Protected Account
                   </div>
 
-                  <small class="text-muted">
-                    This page is protected by
-                    a Vue Router authentication guard.
+
+                  <small
+                    class="
+                      text-muted
+                    "
+                  >
+                    This page is
+                    protected by a
+                    Vue Router
+                    authentication
+                    guard.
                   </small>
+
                 </div>
+
               </div>
 
 
+              <!-- =========================================== -->
               <!-- Firestore profile -->
+              <!-- =========================================== -->
+
               <div
                 class="
                   d-flex
-                  align-items-center
+                  align-items-start
                 "
               >
-                <span class="fs-4 me-3">
+
+                <span
+                  class="
+                    fs-4
+                    me-3
+                  "
+                  aria-hidden="true"
+                >
                   ☁️
                 </span>
 
+
                 <div>
-                  <div class="fw-semibold">
+
+                  <div
+                    class="
+                      fw-semibold
+                    "
+                  >
                     Firestore Profile
                   </div>
 
-                  <small class="text-muted">
-                    Your application profile and role
-                    are stored in Cloud Firestore.
+
+                  <small
+                    class="
+                      text-muted
+                    "
+                  >
+                    Your application
+                    profile and role
+                    are stored in
+                    Cloud Firestore.
                   </small>
+
                 </div>
+
               </div>
 
             </div>
           </div>
 
-        </div>
+        </section>
 
       </div>
 
@@ -406,8 +561,11 @@ const roleLabel =
           alert-warning
         "
         role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
       >
-        Your account information is currently unavailable.
+        Your account information is
+        currently unavailable.
       </div>
 
 
@@ -415,30 +573,134 @@ const roleLabel =
       <!-- Community activity -->
       <!-- ================================================= -->
 
-      <div
-        v-if="account"
+      <section
+        v-if="
+          account
+        "
         class="
           card
           border-0
           shadow-sm
           mt-4
         "
+        aria-labelledby="community-activity-title"
       >
-        <div class="card-body p-4">
+        <div
+          class="
+            card-body
+            p-4
+          "
+        >
 
-          <h2 class="h5 fw-bold mb-2">
+          <h2
+            id="community-activity-title"
+            class="
+              h5
+              fw-bold
+              mb-2
+            "
+          >
             My Community Activity
           </h2>
 
-          <p class="text-muted mb-0">
-            Your recycling location ratings
-            and future community activity
-            will appear here.
+
+          <p
+            class="
+              text-muted
+              mb-0
+            "
+          >
+            Your recycling location
+            ratings and future
+            community activity will
+            appear here.
           </p>
 
         </div>
-      </div>
+      </section>
 
     </div>
   </main>
 </template>
+
+
+<style scoped>
+
+/* ===================================================== */
+/* Header colour */
+/* ===================================================== */
+
+.account-eyebrow {
+  color:
+    #146c43;
+}
+
+
+/* ===================================================== */
+/* Account definition list */
+/* ===================================================== */
+
+.account-details {
+  width:
+    100%;
+}
+
+
+.account-detail-row {
+  display:
+    grid;
+
+  grid-template-columns:
+    minmax(
+      120px,
+      35%
+    )
+    1fr;
+
+  gap:
+    1rem;
+
+  padding:
+    1rem 0;
+}
+
+
+.account-detail-row dt {
+  margin:
+    0;
+
+  color:
+    #5c636a;
+
+  font-weight:
+    500;
+}
+
+
+.account-detail-row dd {
+  margin:
+    0;
+
+  font-weight:
+    600;
+}
+
+
+/* ===================================================== */
+/* Responsive layout */
+/* ===================================================== */
+
+@media (
+  max-width: 576px
+) {
+
+  .account-detail-row {
+    grid-template-columns:
+      1fr;
+
+    gap:
+      0.25rem;
+  }
+
+}
+</style>
