@@ -153,6 +153,17 @@ const handleLogout =
           </li>
 
 
+          <!-- Recycling Map -->
+          <li class="nav-item">
+            <RouterLink
+              class="nav-link"
+              to="/map"
+            >
+              Recycling Map
+            </RouterLink>
+          </li>
+
+
           <!-- ================================================= -->
           <!-- Guest navigation -->
           <!-- ================================================= -->

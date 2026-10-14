@@ -7,6 +7,7 @@ import HomeView from '../views/HomeView.vue'
 import RecyclingFinderView from '../views/RecyclingFinderView.vue'
 import SearchResultsView from '../views/SearchResultsView.vue'
 import DataExplorerView from '../views/DataExplorerView.vue'
+import MapView from '../views/MapView.vue'
 
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
@@ -47,6 +48,7 @@ const router = createRouter({
       component: SearchResultsView,
     },
 
+
     // =====================================================
     // Interactive Data Explorer
     //
@@ -62,6 +64,23 @@ const router = createRouter({
       path: '/data-explorer',
       name: 'data-explorer',
       component: DataExplorerView,
+    },
+
+
+    // =====================================================
+    // Recycling Map
+    //
+    // This public page demonstrates:
+    // - Recycling location POI markers
+    // - Location search
+    // - Browser geolocation
+    // - Driving / walking / cycling routes
+    // - Distance and estimated travel time
+    // =====================================================
+    {
+      path: '/map',
+      name: 'map',
+      component: MapView,
     },
 
 
