@@ -8,6 +8,7 @@ import RecyclingFinderView from '../views/RecyclingFinderView.vue'
 import SearchResultsView from '../views/SearchResultsView.vue'
 import DataExplorerView from '../views/DataExplorerView.vue'
 import MapView from '../views/MapView.vue'
+import ImpactCalculatorView from '../views/ImpactCalculatorView.vue'
 
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
@@ -21,154 +22,247 @@ import {
 } from '../services/authService'
 
 
-const router = createRouter({
-  history: createWebHistory(
-    import.meta.env.BASE_URL,
-  ),
+const router =
+  createRouter({
+    history:
+      createWebHistory(
+        import.meta.env.BASE_URL,
+      ),
 
-  routes: [
-    // =====================================================
-    // Public pages
-    // =====================================================
-    {
-      path: '/',
-      name: 'home',
-      component: HomeView,
-    },
+    routes: [
 
-    {
-      path: '/recycle',
-      name: 'recycle',
-      component: RecyclingFinderView,
-    },
+      // =====================================================
+      // Public pages
+      // =====================================================
 
-    {
-      path: '/results',
-      name: 'results',
-      component: SearchResultsView,
-    },
-
-
-    // =====================================================
-    // Interactive Data Explorer
-    //
-    // This public page demonstrates:
-    // - Two independent interactive tables
-    // - Global search
-    // - Individual column filters
-    // - Ascending / descending sorting
-    // - Pagination with 10 rows per page
-    // - Accessible table controls
-    // =====================================================
-    {
-      path: '/data-explorer',
-      name: 'data-explorer',
-      component: DataExplorerView,
-    },
-
-
-    // =====================================================
-    // Recycling Map
-    //
-    // This public page demonstrates:
-    // - Recycling location POI markers
-    // - Location search
-    // - Browser geolocation
-    // - Driving / walking / cycling routes
-    // - Distance and estimated travel time
-    // =====================================================
-    {
-      path: '/map',
-      name: 'map',
-      component: MapView,
-    },
-
-
-    // =====================================================
-    // Authentication pages
-    // =====================================================
-    {
-      path: '/login',
-      name: 'login',
-      component: LoginView,
-    },
-
-    {
-      path: '/register',
-      name: 'register',
-      component: RegisterView,
-    },
-
-
-    // =====================================================
-    // Protected user account page
-    //
-    // Only authenticated Firebase users
-    // can access this route.
-    // =====================================================
-    {
-      path: '/account',
-      name: 'account',
-      component: AccountView,
-
-      meta: {
-        requiresAuth: true,
+      {
+        path: '/',
+        name: 'home',
+        component:
+          HomeView,
       },
-    },
 
 
-    // =====================================================
-    // Protected Email page
-    //
-    // Only authenticated Firebase users
-    // can access the email composition page.
-    //
-    // The backend Cloud Function also checks
-    // request.auth, providing server-side protection.
-    // =====================================================
-    {
-      path: '/email',
-      name: 'email',
-      component: EmailView,
-
-      meta: {
-        requiresAuth: true,
+      {
+        path: '/recycle',
+        name: 'recycle',
+        component:
+          RecyclingFinderView,
       },
-    },
 
 
-    // =====================================================
-    // Administrator-only page
-    //
-    // The user must:
-    // 1. Be authenticated
-    // 2. Have role === 'admin' in Firestore
-    // =====================================================
-    {
-      path: '/admin',
-      name: 'admin',
-      component: AdminView,
-
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
+      {
+        path: '/results',
+        name: 'results',
+        component:
+          SearchResultsView,
       },
+
+
+      // =====================================================
+      // Interactive Data Explorer
+      //
+      // This public page demonstrates:
+      //
+      // - Two independent interactive tables
+      // - Global search
+      // - Individual column filters
+      // - Ascending / descending sorting
+      // - Pagination with 10 rows per page
+      // - Accessible table controls
+      // =====================================================
+
+      {
+        path:
+          '/data-explorer',
+
+        name:
+          'data-explorer',
+
+        component:
+          DataExplorerView,
+      },
+
+
+      // =====================================================
+      // Recycling Map
+      //
+      // This public page demonstrates:
+      //
+      // - Recycling location POI markers
+      // - Location search
+      // - Browser geolocation
+      // - Driving / walking / cycling routes
+      // - Distance and estimated travel time
+      // =====================================================
+
+      {
+        path:
+          '/map',
+
+        name:
+          'map',
+
+        component:
+          MapView,
+      },
+
+
+      // =====================================================
+      // Recycling Impact Calculator
+      //
+      // This public page demonstrates:
+      //
+      // - Firebase callable Cloud Function
+      // - Server-side validation
+      // - Server-side business logic
+      // - Material-specific recycling calculations
+      // - Estimated landfill diversion
+      // - Estimated CO2e saving
+      // - Accessible result presentation
+      //
+      // Cloud Function:
+      //
+      // calculateRecyclingImpact
+      // =====================================================
+
+      {
+        path:
+          '/impact',
+
+        name:
+          'impact',
+
+        component:
+          ImpactCalculatorView,
+      },
+
+
+      // =====================================================
+      // Authentication pages
+      // =====================================================
+
+      {
+        path:
+          '/login',
+
+        name:
+          'login',
+
+        component:
+          LoginView,
+      },
+
+
+      {
+        path:
+          '/register',
+
+        name:
+          'register',
+
+        component:
+          RegisterView,
+      },
+
+
+      // =====================================================
+      // Protected user account page
+      //
+      // Only authenticated Firebase users
+      // can access this route.
+      // =====================================================
+
+      {
+        path:
+          '/account',
+
+        name:
+          'account',
+
+        component:
+          AccountView,
+
+        meta: {
+          requiresAuth:
+            true,
+        },
+      },
+
+
+      // =====================================================
+      // Protected Email page
+      //
+      // Only authenticated Firebase users
+      // can access the email composition page.
+      //
+      // The backend Cloud Function also checks
+      // request.auth, providing server-side protection.
+      // =====================================================
+
+      {
+        path:
+          '/email',
+
+        name:
+          'email',
+
+        component:
+          EmailView,
+
+        meta: {
+          requiresAuth:
+            true,
+        },
+      },
+
+
+      // =====================================================
+      // Administrator-only page
+      //
+      // The user must:
+      //
+      // 1. Be authenticated
+      // 2. Have role === 'admin' in Firestore
+      // =====================================================
+
+      {
+        path:
+          '/admin',
+
+        name:
+          'admin',
+
+        component:
+          AdminView,
+
+        meta: {
+          requiresAuth:
+            true,
+
+          requiresAdmin:
+            true,
+        },
+      },
+    ],
+
+
+    // =====================================================
+    // Scroll behaviour
+    //
+    // Return to the top whenever the route changes.
+    // =====================================================
+
+    scrollBehavior() {
+      return {
+        top:
+          0,
+
+        left:
+          0,
+      }
     },
-  ],
-
-
-  // =====================================================
-  // Scroll behaviour
-  //
-  // Return to the top whenever the route changes.
-  // =====================================================
-  scrollBehavior() {
-    return {
-      top: 0,
-      left: 0,
-    }
-  },
-})
+  })
 
 
 // ======================================================
@@ -194,6 +288,7 @@ router.beforeEach(
     // incorrectly redirect the user to /login before
     // Firebase has finished loading the session.
     // --------------------------------------------------
+
     await waitForAuthReady()
 
 
@@ -201,10 +296,12 @@ router.beforeEach(
     // Read the latest authenticated user profile.
     //
     // This profile combines:
+    //
     // - Firebase Authentication identity
     // - Firestore application profile
     // - Firestore role information
     // --------------------------------------------------
+
     const currentUser =
       getCurrentUser()
 
@@ -217,6 +314,7 @@ router.beforeEach(
     // is currently logged in, redirect to Login.
     //
     // This protects:
+    //
     // - /account
     // - /email
     // - /admin
@@ -231,7 +329,8 @@ router.beforeEach(
       !currentUser
     ) {
       return {
-        name: 'login',
+        name:
+          'login',
 
         query: {
           redirect:
@@ -258,7 +357,8 @@ router.beforeEach(
         'admin'
     ) {
       return {
-        name: 'account',
+        name:
+          'account',
       }
     }
 
@@ -269,8 +369,10 @@ router.beforeEach(
     // ==================================================
 
     const isAuthPage =
-      to.name === 'login' ||
-      to.name === 'register'
+      to.name ===
+        'login' ||
+      to.name ===
+        'register'
 
 
     if (
@@ -280,20 +382,24 @@ router.beforeEach(
 
       // Administrator goes directly
       // to the Admin Dashboard.
+
       if (
         currentUser.role ===
           'admin'
       ) {
         return {
-          name: 'admin',
+          name:
+            'admin',
         }
       }
 
 
       // Normal authenticated user goes
       // directly to their Account page.
+
       return {
-        name: 'account',
+        name:
+          'account',
       }
     }
 

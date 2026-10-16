@@ -769,3 +769,301 @@ exports.sendEmail =
         }
       },
   );
+
+  // ======================================================
+// CLOUD FUNCTION:
+// calculateRecyclingImpact
+// ======================================================
+//
+// Purpose:
+//
+// Calculate an educational estimate of the environmental
+// impact created by recycling a selected material.
+//
+// Input:
+//
+// {
+//   material: "Plastics",
+//   weight: 10
+// }
+//
+// Output:
+//
+// {
+//   material,
+//   weightKg,
+//   landfillDivertedKg,
+//   estimatedCo2eSavedKg,
+//   impactLevel,
+//   tip,
+//   disclaimer
+// }
+//
+// Important:
+//
+// The CO2e factors below are illustrative educational
+// estimates for this university project.
+//
+// They are NOT intended to represent an official
+// life-cycle assessment or government environmental
+// accounting methodology.
+// ======================================================
+
+exports.calculateRecyclingImpact =
+  onCall(
+      {
+        region:
+          "australia-southeast2",
+
+        maxInstances:
+          5,
+      },
+
+      async (request) => {
+        // ==================================================
+        // 1. Read request data
+        // ==================================================
+
+        const {
+          material,
+          weight,
+        } = request.data || {};
+
+
+        // ==================================================
+        // 2. Validate material
+        // ==================================================
+
+        if (
+          !material ||
+          typeof material !==
+            "string"
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Please select a recycling material.",
+          );
+        }
+
+
+        const cleanMaterial =
+          material.trim();
+
+
+        // ==================================================
+        // 3. Validate weight
+        // ==================================================
+
+        const numericWeight =
+          Number(
+              weight,
+          );
+
+
+        if (
+          !Number.isFinite(
+              numericWeight,
+          ) ||
+          numericWeight <=
+            0
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Weight must be greater than 0 kilograms.",
+          );
+        }
+
+
+        if (
+          numericWeight >
+          10000
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Weight must not exceed 10,000 kilograms.",
+          );
+        }
+
+
+        // ==================================================
+        // 4. Educational impact factors
+        // ==================================================
+        //
+        // Approximate demonstration factors:
+        //
+        // estimated kg CO2e avoided per kg recycled.
+        //
+        // These values are intentionally treated as
+        // educational project estimates rather than
+        // authoritative environmental accounting data.
+        // ==================================================
+
+        const materialFactors = {
+          Batteries: {
+            co2eFactor:
+              0.6,
+
+            tip:
+              "Keep batteries separate from general waste and take them to a dedicated battery recycling point.",
+          },
+
+          "E-Waste": {
+            co2eFactor:
+              1.8,
+
+            tip:
+              "Reuse or repair electronics where possible, then take unwanted devices to an approved e-waste collection point.",
+          },
+
+          Plastics: {
+            co2eFactor:
+              1.5,
+
+            tip:
+              "Check the accepted plastic type before recycling and keep recyclable plastics clean and dry.",
+          },
+
+          Clothing: {
+            co2eFactor:
+              3.2,
+
+            tip:
+              "Reuse, donate or repair clothing before recycling textiles that can no longer be worn.",
+          },
+
+          Furniture: {
+            co2eFactor:
+              1.0,
+
+            tip:
+              "Consider donating or repairing usable furniture before sending damaged items to an appropriate recovery facility.",
+          },
+        };
+
+
+        // ==================================================
+        // 5. Confirm supported material
+        // ==================================================
+
+        const materialData =
+          materialFactors[
+              cleanMaterial
+          ];
+
+
+        if (!materialData) {
+          throw new HttpsError(
+              "invalid-argument",
+              "The selected material is not supported.",
+          );
+        }
+
+
+        // ==================================================
+        // 6. Calculate environmental estimates
+        // ==================================================
+
+        const landfillDivertedKg =
+          numericWeight;
+
+
+        const estimatedCo2eSavedKg =
+          numericWeight *
+          materialData.co2eFactor;
+
+
+        // ==================================================
+        // 7. Determine impact level
+        // ==================================================
+
+        let impactLevel;
+
+
+        if (
+          estimatedCo2eSavedKg <
+          5
+        ) {
+          impactLevel =
+            "Small";
+        } else if (
+          estimatedCo2eSavedKg <
+          20
+        ) {
+          impactLevel =
+            "Moderate";
+        } else {
+          impactLevel =
+            "High";
+        }
+
+
+        // ==================================================
+        // 8. Build response
+        // ==================================================
+
+        const result = {
+          material:
+            cleanMaterial,
+
+          weightKg:
+            Number(
+                numericWeight
+                    .toFixed(
+                        2,
+                    ),
+            ),
+
+          landfillDivertedKg:
+            Number(
+                landfillDivertedKg
+                    .toFixed(
+                        2,
+                    ),
+            ),
+
+          estimatedCo2eSavedKg:
+            Number(
+                estimatedCo2eSavedKg
+                    .toFixed(
+                        2,
+                    ),
+            ),
+
+          impactLevel:
+            impactLevel,
+
+          tip:
+            materialData.tip,
+
+          disclaimer:
+            "Environmental impact values are illustrative educational estimates for the ZWV Circular Hub project and are not official life-cycle assessment figures.",
+        };
+
+
+        // ==================================================
+        // 9. Log successful calculation
+        // ==================================================
+
+        logger.info(
+            "Recycling impact calculated.",
+            {
+              material:
+                cleanMaterial,
+
+              weightKg:
+                numericWeight,
+
+              estimatedCo2eSavedKg:
+                result
+                    .estimatedCo2eSavedKg,
+            },
+        );
+
+
+        // ==================================================
+        // 10. Return result
+        // ==================================================
+
+        return result;
+      },
+  );

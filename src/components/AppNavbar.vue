@@ -48,9 +48,12 @@ const unsubscribe =
 
 
 // Stop listening when this component is destroyed.
-onUnmounted(() => {
-  unsubscribe()
-})
+
+onUnmounted(
+  () => {
+    unsubscribe()
+  },
+)
 
 
 // ======================================================
@@ -115,6 +118,7 @@ const handleLogout =
           ♻
         </span>
 
+
         <span>
           ZWV Circular Hub
         </span>
@@ -146,7 +150,7 @@ const handleLogout =
 
 
       <!-- ================================================= -->
-      <!-- Main navigation links -->
+      <!-- Main navigation -->
       <!-- ================================================= -->
 
       <div
@@ -182,6 +186,8 @@ const handleLogout =
           </li>
 
 
+          <!-- Recycle & Reuse -->
+
           <li
             class="nav-item"
           >
@@ -196,6 +202,8 @@ const handleLogout =
           </li>
 
 
+          <!-- Data Explorer -->
+
           <li
             class="nav-item"
           >
@@ -209,6 +217,8 @@ const handleLogout =
             </RouterLink>
           </li>
 
+
+          <!-- Recycling Map -->
 
           <li
             class="nav-item"
@@ -225,6 +235,31 @@ const handleLogout =
 
 
           <!-- ================================================= -->
+          <!-- Recycling Impact Calculator -->
+          <!-- ================================================= -->
+          <!--
+            Public serverless feature.
+
+            The page calls the Firebase callable Cloud Function:
+
+            calculateRecyclingImpact
+          -->
+
+          <li
+            class="nav-item"
+          >
+            <RouterLink
+              class="
+                nav-link
+              "
+              to="/impact"
+            >
+              Impact Calculator
+            </RouterLink>
+          </li>
+
+
+          <!-- ================================================= -->
           <!-- Guest navigation -->
           <!-- ================================================= -->
 
@@ -233,6 +268,8 @@ const handleLogout =
               !currentUser
             "
           >
+
+            <!-- Login -->
 
             <li
               class="nav-item"
@@ -247,6 +284,8 @@ const handleLogout =
               </RouterLink>
             </li>
 
+
+            <!-- Register -->
 
             <li
               class="
@@ -275,7 +314,11 @@ const handleLogout =
           <!-- Authenticated navigation -->
           <!-- ================================================= -->
 
-          <template v-else>
+          <template
+            v-else
+          >
+
+            <!-- Email -->
 
             <li
               class="nav-item"
@@ -291,7 +334,9 @@ const handleLogout =
             </li>
 
 
-            <!-- Admin only -->
+            <!-- ================================================= -->
+            <!-- Administrator only -->
+            <!-- ================================================= -->
 
             <li
               v-if="
@@ -310,6 +355,8 @@ const handleLogout =
               </RouterLink>
             </li>
 
+
+            <!-- My Account -->
 
             <li
               class="nav-item"
@@ -346,6 +393,7 @@ const handleLogout =
                 >
                   Current signed-in user:
                 </span>
+
 
                 Hi,
                 {{
