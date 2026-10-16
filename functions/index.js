@@ -34,29 +34,20 @@ const {
   Buffer,
 } = require("node:buffer");
 
+const {
+  recyclingLocations,
+} = require("./data/recyclingLocations");
+
 
 // ======================================================
 // Firebase Admin
-// ======================================================
-//
-// Firebase Admin runs only in the trusted Cloud Function
-// environment.
-//
-// It is used to:
-//
-// 1. Read registered user profiles from Firestore.
-// 2. Verify Firebase Authentication accounts.
-// 3. Resolve a selected user UID to the real email
-//    address on the server.
-//
-// The browser never decides the final recipient email.
 // ======================================================
 
 initializeApp();
 
 
 // ======================================================
-// Global options
+// Global Cloud Functions options
 // ======================================================
 
 setGlobalOptions({
@@ -65,7 +56,7 @@ setGlobalOptions({
 
 
 // ======================================================
-// Resend secret
+// Resend API secret
 // ======================================================
 
 const resendApiKey =
@@ -96,17 +87,15 @@ const isValidEmail =
 //
 // Purpose:
 //
-// Return registered ZWV Circular Hub users who may be
+// Return registered ZWV Circular Hub users that can be
 // selected as email recipients.
 //
 // Security:
 //
 // - Caller must be authenticated.
-// - User information is read server-side.
-// - Disabled / invalid Authentication accounts are not
-//   returned.
-// - Only minimal information needed by the email page
-//   is returned.
+// - Firestore profiles are checked server-side.
+// - Firebase Authentication accounts are verified.
+// - Disabled accounts are excluded.
 // ======================================================
 
 exports.getEmailRecipients =
@@ -120,9 +109,9 @@ exports.getEmailRecipients =
       },
 
       async (request) => {
-        // ----------------------------------------------
-        // Authentication
-        // ----------------------------------------------
+        // ==================================================
+        // 1. Require authentication
+        // ==================================================
 
         if (!request.auth) {
           throw new HttpsError(
@@ -135,6 +124,7 @@ exports.getEmailRecipients =
         try {
           const db =
             getFirestore();
+
 
           const snapshot =
             await db
@@ -154,12 +144,8 @@ exports.getEmailRecipients =
                         userDocument.data() ||
                         {};
 
-                      try {
-                        // --------------------------------
-                        // Confirm the corresponding
-                        // Firebase Authentication account.
-                        // --------------------------------
 
+                      try {
                         const authUser =
                           await getAuth()
                               .getUser(
@@ -167,10 +153,8 @@ exports.getEmailRecipients =
                               );
 
 
-                        // --------------------------------
-                        // Disabled accounts are not valid
-                        // email recipients.
-                        // --------------------------------
+                        // Disabled users or users without
+                        // email addresses cannot receive mail.
 
                         if (
                           authUser.disabled ||
@@ -208,11 +192,9 @@ exports.getEmailRecipients =
                             email,
                         };
                       } catch (error) {
-                        // --------------------------------
                         // Ignore orphan Firestore
-                        // profiles that no longer have an
-                        // Authentication account.
-                        // --------------------------------
+                        // profiles that no longer have
+                        // Firebase Authentication accounts.
 
                         if (
                           error.code ===
@@ -254,6 +236,7 @@ exports.getEmailRecipients =
                       const secondName =
                         second.username ||
                         second.email;
+
 
                       return firstName
                           .localeCompare(
@@ -316,13 +299,13 @@ exports.getEmailRecipients =
 // Security flow:
 //
 // 1. Sender must be authenticated.
-// 2. Frontend provides recipient UID, NOT arbitrary email.
+// 2. Frontend sends recipient UID, not arbitrary email.
 // 3. UID must exist in Firebase Authentication.
-// 4. UID must have a matching Firestore user profile.
-// 5. Disabled accounts cannot receive email.
-// 6. Recipient email is resolved by the server.
-// 7. Subject/message/attachment are validated.
-// 8. Resend API key stays in Secret Manager.
+// 4. UID must have a Firestore application profile.
+// 5. Disabled accounts cannot receive mail.
+// 6. Email address is resolved server-side.
+// 7. Email content is validated.
+// 8. Resend API key remains in Secret Manager.
 // ======================================================
 
 exports.sendEmail =
@@ -341,7 +324,7 @@ exports.sendEmail =
 
       async (request) => {
         // ==================================================
-        // 1. Sender authentication
+        // 1. Authentication
         // ==================================================
 
         if (!request.auth) {
@@ -357,7 +340,8 @@ exports.sendEmail =
           subject,
           message,
           attachment,
-        } = request.data || {};
+        } =
+          request.data || {};
 
 
         // ==================================================
@@ -392,7 +376,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 3. Resolve recipient from Firebase Authentication
+        // 3. Resolve recipient using Firebase Auth
         // ==================================================
 
         let recipientUser;
@@ -451,7 +435,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 4. Disabled accounts cannot receive messages
+        // 4. Reject disabled users
         // ==================================================
 
         if (
@@ -465,7 +449,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 5. Recipient must have a Firestore profile
+        // 5. Verify Firestore application profile
         // ==================================================
 
         try {
@@ -532,7 +516,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 6. Resolve final email server-side
+        // 6. Resolve recipient email server-side
         // ==================================================
 
         const recipientEmail =
@@ -595,7 +579,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 9. Validate attachment
+        // 9. Validate optional attachment
         // ==================================================
 
         const attachments = [];
@@ -730,7 +714,8 @@ exports.sendEmail =
               true,
 
             emailId:
-              data?.id || null,
+              data?.id ||
+              null,
 
             recipientUid:
               recipientUser.uid,
@@ -770,7 +755,8 @@ exports.sendEmail =
       },
   );
 
-  // ======================================================
+
+// ======================================================
 // CLOUD FUNCTION:
 // calculateRecyclingImpact
 // ======================================================
@@ -778,7 +764,9 @@ exports.sendEmail =
 // Purpose:
 //
 // Calculate an educational estimate of the environmental
-// impact created by recycling a selected material.
+// impact produced by recycling a selected material.
+//
+// This is an independent non-email Cloud Function.
 //
 // Input:
 //
@@ -786,27 +774,6 @@ exports.sendEmail =
 //   material: "Plastics",
 //   weight: 10
 // }
-//
-// Output:
-//
-// {
-//   material,
-//   weightKg,
-//   landfillDivertedKg,
-//   estimatedCo2eSavedKg,
-//   impactLevel,
-//   tip,
-//   disclaimer
-// }
-//
-// Important:
-//
-// The CO2e factors below are illustrative educational
-// estimates for this university project.
-//
-// They are NOT intended to represent an official
-// life-cycle assessment or government environmental
-// accounting methodology.
 // ======================================================
 
 exports.calculateRecyclingImpact =
@@ -821,13 +788,14 @@ exports.calculateRecyclingImpact =
 
       async (request) => {
         // ==================================================
-        // 1. Read request data
+        // 1. Read input
         // ==================================================
 
         const {
           material,
           weight,
-        } = request.data || {};
+        } =
+          request.data || {};
 
 
         // ==================================================
@@ -886,16 +854,7 @@ exports.calculateRecyclingImpact =
 
 
         // ==================================================
-        // 4. Educational impact factors
-        // ==================================================
-        //
-        // Approximate demonstration factors:
-        //
-        // estimated kg CO2e avoided per kg recycled.
-        //
-        // These values are intentionally treated as
-        // educational project estimates rather than
-        // authoritative environmental accounting data.
+        // 4. Educational environmental factors
         // ==================================================
 
         const materialFactors = {
@@ -960,7 +919,7 @@ exports.calculateRecyclingImpact =
 
 
         // ==================================================
-        // 6. Calculate environmental estimates
+        // 6. Calculate estimates
         // ==================================================
 
         const landfillDivertedKg =
@@ -998,7 +957,7 @@ exports.calculateRecyclingImpact =
 
 
         // ==================================================
-        // 8. Build response
+        // 8. Build result
         // ==================================================
 
         const result = {
@@ -1040,10 +999,6 @@ exports.calculateRecyclingImpact =
         };
 
 
-        // ==================================================
-        // 9. Log successful calculation
-        // ==================================================
-
         logger.info(
             "Recycling impact calculated.",
             {
@@ -1060,10 +1015,426 @@ exports.calculateRecyclingImpact =
         );
 
 
+        return result;
+      },
+  );
+
+
+// ======================================================
+// CLOUD FUNCTION:
+// recommendRecyclingLocations
+// ======================================================
+//
+// Purpose:
+//
+// Recommend recycling locations using server-side
+// filtering, scoring and ranking.
+//
+// Ranking considers:
+//
+// 1. Whether the location accepts the selected material
+// 2. Exact postcode match
+// 3. Whether the location is currently open
+// 4. Location rating
+// 5. Approximate distance
+//
+// This is independent non-email Cloud Function #2.
+// ======================================================
+
+exports.recommendRecyclingLocations =
+  onCall(
+      {
+        region:
+          "australia-southeast2",
+
+        maxInstances:
+          5,
+      },
+
+      async (request) => {
         // ==================================================
-        // 10. Return result
+        // 1. Read input
         // ==================================================
 
-        return result;
+        const {
+          material,
+          postcode,
+        } =
+          request.data || {};
+
+
+        // ==================================================
+        // 2. Supported materials
+        // ==================================================
+
+        const supportedMaterials = [
+          "Batteries",
+          "E-Waste",
+          "Plastics",
+          "Clothing",
+          "Furniture",
+        ];
+
+
+        // ==================================================
+        // 3. Validate material
+        // ==================================================
+
+        if (
+          !material ||
+          typeof material !==
+            "string"
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Please select a recycling material.",
+          );
+        }
+
+
+        const cleanMaterial =
+          material.trim();
+
+
+        if (
+          !supportedMaterials.includes(
+              cleanMaterial,
+          )
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "The selected recycling material is not supported.",
+          );
+        }
+
+
+        // ==================================================
+        // 4. Validate postcode
+        // ==================================================
+
+        if (
+          !postcode ||
+          typeof postcode !==
+            "string"
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Please enter a Victorian postcode.",
+          );
+        }
+
+
+        const cleanPostcode =
+          postcode.trim();
+
+
+        const postcodePattern =
+          /^\d{4}$/;
+
+
+        if (
+          !postcodePattern.test(
+              cleanPostcode,
+          )
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Postcode must contain exactly four digits.",
+          );
+        }
+
+
+        // ==================================================
+        // 5. Filter by accepted material
+        // ==================================================
+
+        const matchingLocations =
+          recyclingLocations.filter(
+              (location) =>
+                Array.isArray(
+                    location.acceptedMaterials,
+                ) &&
+                location
+                    .acceptedMaterials
+                    .includes(
+                        cleanMaterial,
+                    ),
+          );
+
+
+        // ==================================================
+        // 6. Score every matching location
+        // ==================================================
+
+        const rankedLocations =
+          matchingLocations.map(
+              (location) => {
+                const samePostcode =
+                  location.postcode ===
+                  cleanPostcode;
+
+
+                const isOpen =
+                  location.status ===
+                  "Open";
+
+
+                let recommendationScore =
+                  0;
+
+
+                // ------------------------------------------
+                // Exact postcode
+                // ------------------------------------------
+
+                if (samePostcode) {
+                  recommendationScore +=
+                    100;
+                }
+
+
+                // ------------------------------------------
+                // Open status
+                // ------------------------------------------
+
+                if (isOpen) {
+                  recommendationScore +=
+                    40;
+                }
+
+
+                // ------------------------------------------
+                // Rating
+                //
+                // Example:
+                // 4.8 stars = 24 points
+                // ------------------------------------------
+
+                recommendationScore +=
+                  Number(
+                      location.rating,
+                  ) * 5;
+
+
+                // ------------------------------------------
+                // Approximate distance bonus
+                //
+                // Existing project dataset already includes
+                // an approximate distance field.
+                // ------------------------------------------
+
+                const distanceBonus =
+                  Math.max(
+                      0,
+                      20 -
+                      Number(
+                          location.distance,
+                      ),
+                  );
+
+
+                recommendationScore +=
+                  distanceBonus;
+
+
+                // ------------------------------------------
+                // Human-readable reasons
+                // ------------------------------------------
+
+                const reasons = [
+                  `Accepts ${cleanMaterial}`,
+                ];
+
+
+                if (samePostcode) {
+                  reasons.push(
+                      "Same postcode",
+                  );
+                }
+
+
+                if (isOpen) {
+                  reasons.push(
+                      "Currently open",
+                  );
+                } else {
+                  reasons.push(
+                      "Currently closed",
+                  );
+                }
+
+
+                if (
+                  Number(
+                      location.rating,
+                  ) >=
+                  4.5
+                ) {
+                  reasons.push(
+                      "Highly rated",
+                  );
+                }
+
+
+                return {
+                  ...location,
+
+                  samePostcode:
+                    samePostcode,
+
+                  recommendationScore:
+                    Number(
+                        recommendationScore
+                            .toFixed(
+                                1,
+                            ),
+                    ),
+
+                  recommendationReasons:
+                    reasons,
+                };
+              },
+          );
+
+
+        // ==================================================
+        // 7. Sort recommendations
+        // ==================================================
+
+        rankedLocations.sort(
+            (
+                first,
+                second,
+            ) => {
+              // ------------------------------------------
+              // Exact postcode first
+              // ------------------------------------------
+
+              if (
+                first.samePostcode !==
+                second.samePostcode
+              ) {
+                return first.samePostcode
+                  ? -1
+                  : 1;
+              }
+
+
+              // ------------------------------------------
+              // Open before closed
+              // ------------------------------------------
+
+              if (
+                first.status !==
+                second.status
+              ) {
+                if (
+                  first.status ===
+                  "Open"
+                ) {
+                  return -1;
+                }
+
+
+                if (
+                  second.status ===
+                  "Open"
+                ) {
+                  return 1;
+                }
+              }
+
+
+              // ------------------------------------------
+              // Higher rating first
+              // ------------------------------------------
+
+              if (
+                first.rating !==
+                second.rating
+              ) {
+                return (
+                  Number(
+                      second.rating,
+                  ) -
+                  Number(
+                      first.rating,
+                  )
+                );
+              }
+
+
+              // ------------------------------------------
+              // Shorter approximate distance first
+              // ------------------------------------------
+
+              return (
+                Number(
+                    first.distance,
+                ) -
+                Number(
+                    second.distance,
+                )
+              );
+            },
+        );
+
+
+        // ==================================================
+        // 8. Return top five
+        // ==================================================
+
+        const recommendations =
+          rankedLocations.slice(
+              0,
+              5,
+          );
+
+
+        // ==================================================
+        // 9. Log successful recommendation
+        // ==================================================
+
+        logger.info(
+            "Recycling location recommendations generated.",
+            {
+              material:
+                cleanMaterial,
+
+              postcode:
+                cleanPostcode,
+
+              totalMatches:
+                matchingLocations.length,
+
+              returned:
+                recommendations.length,
+            },
+        );
+
+
+        // ==================================================
+        // 10. Return structured response
+        // ==================================================
+
+        return {
+          material:
+            cleanMaterial,
+
+          postcode:
+            cleanPostcode,
+
+          totalMatches:
+            matchingLocations.length,
+
+          returnedCount:
+            recommendations.length,
+
+          recommendations:
+            recommendations,
+
+          rankingExplanation:
+            "Locations are ranked by postcode match, open status, rating and approximate distance.",
+        };
       },
   );

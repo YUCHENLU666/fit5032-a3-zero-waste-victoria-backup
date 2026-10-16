@@ -43,17 +43,58 @@ const router =
       },
 
 
+      // =====================================================
+      // Recycle & Reuse Finder
+      //
+      // Users enter:
+      //
+      // - Material
+      // - Postcode
+      //
+      // The form then navigates to /results.
+      // =====================================================
+
       {
-        path: '/recycle',
-        name: 'recycle',
+        path:
+          '/recycle',
+
+        name:
+          'recycle',
+
         component:
           RecyclingFinderView,
       },
 
 
+      // =====================================================
+      // Smart Recycling Results
+      //
+      // This page now uses the Firebase callable function:
+      //
+      // recommendRecyclingLocations
+      //
+      // The Cloud Function performs:
+      //
+      // - Material filtering
+      // - Postcode matching
+      // - Open / closed ranking
+      // - Rating-based ranking
+      // - Approximate distance ranking
+      // - Recommendation scoring
+      // - Top 5 recommendation selection
+      //
+      // This upgrades the original Recycle & Reuse feature
+      // from client-side filtering to server-side business
+      // logic.
+      // =====================================================
+
       {
-        path: '/results',
-        name: 'results',
+        path:
+          '/results',
+
+        name:
+          'results',
+
         component:
           SearchResultsView,
       },
@@ -310,18 +351,11 @@ router.beforeEach(
     // 1. Protect authenticated routes
     // ==================================================
     //
-    // If a route requires authentication and no user
-    // is currently logged in, redirect to Login.
-    //
     // This protects:
     //
     // - /account
     // - /email
     // - /admin
-    //
-    // The original destination is stored so that after
-    // successful login the user can return to the page
-    // they originally requested.
     // ==================================================
 
     if (
@@ -342,12 +376,6 @@ router.beforeEach(
 
     // ==================================================
     // 2. Protect administrator-only routes
-    // ==================================================
-    //
-    // The /admin route requires role === 'admin'.
-    //
-    // Normal authenticated users are redirected to
-    // their own Account page.
     // ==================================================
 
     if (
@@ -380,9 +408,6 @@ router.beforeEach(
       isAuthPage
     ) {
 
-      // Administrator goes directly
-      // to the Admin Dashboard.
-
       if (
         currentUser.role ===
           'admin'
@@ -393,9 +418,6 @@ router.beforeEach(
         }
       }
 
-
-      // Normal authenticated user goes
-      // directly to their Account page.
 
       return {
         name:

@@ -172,6 +172,9 @@ const handleLogout =
           <!-- Public navigation -->
           <!-- ================================================= -->
 
+
+          <!-- Home -->
+
           <li
             class="nav-item"
           >
@@ -186,7 +189,23 @@ const handleLogout =
           </li>
 
 
+          <!-- ================================================= -->
           <!-- Recycle & Reuse -->
+          <!-- ================================================= -->
+          <!--
+            The Recycle & Reuse workflow now includes
+            server-side smart recommendations.
+
+            Flow:
+
+            /recycle
+                ↓
+            Material + Postcode
+                ↓
+            /results
+                ↓
+            recommendRecyclingLocations Cloud Function
+          -->
 
           <li
             class="nav-item"
@@ -240,7 +259,7 @@ const handleLogout =
           <!--
             Public serverless feature.
 
-            The page calls the Firebase callable Cloud Function:
+            Cloud Function:
 
             calculateRecyclingImpact
           -->
