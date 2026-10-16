@@ -4,19 +4,102 @@
 
 
 /* ===================================================== */
+/* Global user-controlled text size */
+/* ===================================================== */
+/*
+  Default minimum text size is intentionally large.
+
+  Standard     = 22px
+  Large        = 24px
+  Extra Large  = 26px
+
+  Bootstrap uses rem units extensively.
+
+  Therefore changing the root font size scales much of
+  the application consistently, including:
+
+  - Navigation
+  - Headings
+  - Body text
+  - Forms
+  - Buttons
+  - Tables
+  - Cards
+*/
+
+
+html {
+  font-size:
+    22px;
+}
+
+
+html[data-text-size='standard'] {
+  font-size:
+    22px;
+}
+
+
+html[data-text-size='large'] {
+  font-size:
+    24px;
+}
+
+
+html[data-text-size='extra-large'] {
+  font-size:
+    26px;
+}
+
+
+/* ===================================================== */
+/* Large text layout resilience */
+/* ===================================================== */
+
+body {
+  min-width:
+    320px;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+button,
+input,
+select,
+textarea {
+  font-size:
+    1rem;
+}
+
+
+table {
+  font-size:
+    0.92rem;
+}
+
+
+/* ===================================================== */
 /* Skip to main content */
 /* ===================================================== */
 
 .skip-link {
-  position: fixed;
+  position:
+    fixed;
 
-  top: 0.75rem;
-  left: 0.75rem;
+  top:
+    0.75rem;
 
-  z-index: 9999;
+  left:
+    0.75rem;
+
+  z-index:
+    9999;
 
   padding:
-    0.75rem 1rem;
+    0.75rem
+    1rem;
 
   color:
     #ffffff;
@@ -34,7 +117,8 @@
     0.5rem;
 
   box-shadow:
-    0 0.25rem 0.75rem
+    0 0.25rem
+    0.75rem
     rgba(
       0,
       0,
@@ -43,17 +127,23 @@
     );
 
   transform:
-    translateY(-200%);
+    translateY(
+      -200%
+    );
 
   transition:
-    transform 0.15s ease;
+    transform
+    0.15s
+    ease;
 }
 
 
 .skip-link:focus,
 .skip-link:focus-visible {
   transform:
-    translateY(0);
+    translateY(
+      0
+    );
 
   outline:
     3px solid
@@ -87,14 +177,6 @@ textarea:focus-visible,
 /* Route heading focus */
 /* ===================================================== */
 
-/*
-  Page headings receive programmatic focus when a
-  Vue Router navigation occurs.
-
-  This focus is primarily for assistive technology,
-  so it does not need to look like an interactive control.
-*/
-
 h1[tabindex='-1']:focus {
   outline:
     none;
@@ -102,7 +184,7 @@ h1[tabindex='-1']:focus {
 
 
 /* ===================================================== */
-/* Improve links that rely on colour */
+/* Links */
 /* ===================================================== */
 
 main a:not(.btn) {
@@ -117,14 +199,6 @@ main a:not(.btn) {
 /* ===================================================== */
 /* Accessible text contrast */
 /* ===================================================== */
-
-/*
-  Bootstrap's default secondary, muted and success colours
-  can be slightly too light on pale page backgrounds.
-
-  These darker colours provide more reliable WCAG 2.1 AA
-  contrast while preserving the original visual style.
-*/
 
 .text-secondary,
 .text-muted {
@@ -143,11 +217,6 @@ main a:not(.btn) {
 /* Accessible form help text */
 /* ===================================================== */
 
-/*
-  Bootstrap form-text can appear slightly light,
-  especially on pale green or grey backgrounds.
-*/
-
 .form-text {
   color:
     #495057;
@@ -157,11 +226,6 @@ main a:not(.btn) {
 /* ===================================================== */
 /* Accessible placeholder contrast */
 /* ===================================================== */
-
-/*
-  Keep placeholders visible enough without making them
-  compete visually with entered text.
-*/
 
 ::placeholder {
   color:
@@ -176,11 +240,6 @@ main a:not(.btn) {
 /* Disabled controls */
 /* ===================================================== */
 
-/*
-  Disabled controls remain visually distinct while
-  preserving readable text.
-*/
-
 button:disabled,
 input:disabled,
 select:disabled,
@@ -191,19 +250,302 @@ textarea:disabled {
 
 
 /* ===================================================== */
-/* Reduced motion */
+/* HIGH CONTRAST MODE */
 /* ===================================================== */
 
-/*
-  WCAG-friendly behaviour for users who request
-  reduced animation through their operating system.
-*/
+html[data-high-contrast='true']
+body {
+  color:
+    #000000 !important;
+
+  background-color:
+    #ffffff !important;
+}
+
+
+/* Main UI surfaces */
+
+html[data-high-contrast='true']
+.navbar,
+
+html[data-high-contrast='true']
+.card,
+
+html[data-high-contrast='true']
+.modal-content,
+
+html[data-high-contrast='true']
+.dropdown-menu,
+
+html[data-high-contrast='true']
+.list-group-item {
+  color:
+    #000000 !important;
+
+  background-color:
+    #ffffff !important;
+
+  border-color:
+    #000000 !important;
+}
+
+
+/* Tables */
+
+html[data-high-contrast='true']
+.table,
+
+html[data-high-contrast='true']
+.table > :not(caption) > * > * {
+  color:
+    #000000 !important;
+
+  background-color:
+    #ffffff !important;
+
+  border-color:
+    #000000 !important;
+}
+
+
+/* Muted text */
+
+html[data-high-contrast='true']
+.text-secondary,
+
+html[data-high-contrast='true']
+.text-muted,
+
+html[data-high-contrast='true']
+.form-text {
+  color:
+    #111111 !important;
+}
+
+
+/* Links */
+
+html[data-high-contrast='true']
+a:not(.btn) {
+  color:
+    #0037a6 !important;
+
+  text-decoration:
+    underline !important;
+
+  text-decoration-thickness:
+    0.11em !important;
+}
+
+
+/* Forms */
+
+html[data-high-contrast='true']
+.form-control,
+
+html[data-high-contrast='true']
+.form-select {
+  color:
+    #000000 !important;
+
+  background-color:
+    #ffffff !important;
+
+  border:
+    2px solid
+    #000000 !important;
+}
+
+
+/* Success buttons */
+
+html[data-high-contrast='true']
+.btn-success,
+
+html[data-high-contrast='true']
+.btn-outline-success {
+  color:
+    #ffffff !important;
+
+  background-color:
+    #004d18 !important;
+
+  border-color:
+    #004d18 !important;
+}
+
+
+/* Success alerts */
+
+html[data-high-contrast='true']
+.alert-success {
+  color:
+    #002b0d !important;
+
+  background-color:
+    #e9ffe9 !important;
+
+  border:
+    2px solid
+    #002b0d !important;
+}
+
+
+/* Error alerts */
+
+html[data-high-contrast='true']
+.alert-danger {
+  color:
+    #6d0000 !important;
+
+  background-color:
+    #fff0f0 !important;
+
+  border:
+    2px solid
+    #6d0000 !important;
+}
+
+
+/* Stronger focus indicator */
+
+html[data-high-contrast='true']
+a:focus-visible,
+
+html[data-high-contrast='true']
+button:focus-visible,
+
+html[data-high-contrast='true']
+input:focus-visible,
+
+html[data-high-contrast='true']
+select:focus-visible,
+
+html[data-high-contrast='true']
+textarea:focus-visible,
+
+html[data-high-contrast='true']
+[tabindex]:focus-visible {
+  outline:
+    4px solid
+    #ffbf00 !important;
+
+  outline-offset:
+    4px !important;
+}
+
+
+/* ===================================================== */
+/* READABLE SPACING MODE */
+/* ===================================================== */
+
+html[data-readable-spacing='true']
+body {
+  line-height:
+    1.75;
+}
+
+
+/* General text */
+
+html[data-readable-spacing='true']
+p,
+
+html[data-readable-spacing='true']
+li,
+
+html[data-readable-spacing='true']
+label,
+
+html[data-readable-spacing='true']
+.form-text,
+
+html[data-readable-spacing='true']
+td,
+
+html[data-readable-spacing='true']
+th {
+  letter-spacing:
+    0.025em;
+
+  word-spacing:
+    0.08em;
+}
+
+
+/* Paragraph and list line spacing */
+
+html[data-readable-spacing='true']
+p,
+
+html[data-readable-spacing='true']
+li {
+  line-height:
+    1.8;
+}
+
+
+/* Heading spacing */
+
+html[data-readable-spacing='true']
+h1,
+
+html[data-readable-spacing='true']
+h2,
+
+html[data-readable-spacing='true']
+h3,
+
+html[data-readable-spacing='true']
+h4,
+
+html[data-readable-spacing='true']
+h5,
+
+html[data-readable-spacing='true']
+h6 {
+  line-height:
+    1.35;
+}
+
+
+/* ===================================================== */
+/* USER-CONTROLLED REDUCED MOTION */
+/* ===================================================== */
+
+html[data-reduced-motion='true'] *,
+
+html[data-reduced-motion='true'] *::before,
+
+html[data-reduced-motion='true'] *::after {
+  scroll-behavior:
+    auto !important;
+
+  animation-duration:
+    0.01ms !important;
+
+  animation-iteration-count:
+    1 !important;
+
+  transition-duration:
+    0.01ms !important;
+
+  transition-delay:
+    0ms !important;
+}
+
+
+/* ===================================================== */
+/* OPERATING SYSTEM REDUCED MOTION */
+/* ===================================================== */
 
 @media (
   prefers-reduced-motion: reduce
 ) {
   *,
+
   *::before,
+
   *::after {
     scroll-behavior:
       auto !important;
@@ -222,8 +564,9 @@ textarea:disabled {
   }
 }
 
+
 /* ===================================================== */
-/* Accessible Bootstrap success buttons */
+/* Accessible Bootstrap success button */
 /* ===================================================== */
 
 .btn-outline-success {
@@ -259,4 +602,79 @@ textarea:disabled {
 
   --bs-btn-disabled-border-color:
     #146c43;
+}
+
+
+/* ===================================================== */
+/* Large text responsive support */
+/* ===================================================== */
+
+.navbar-nav {
+  flex-wrap:
+    wrap;
+}
+
+
+.btn,
+.form-control,
+.form-select {
+  min-height:
+    44px;
+}
+
+
+.table-responsive {
+  overflow-x:
+    auto;
+
+  -webkit-overflow-scrolling:
+    touch;
+}
+
+
+/* Images and visual content */
+
+img,
+svg,
+canvas {
+  max-width:
+    100%;
+}
+
+
+/* ===================================================== */
+/* Mobile */
+/* ===================================================== */
+/*
+  On very small screens we slightly reduce all three
+  levels to prevent severe horizontal overflow.
+
+  Desktop remains:
+
+  Standard    22
+  Large       24
+  Extra Large 26
+*/
+
+@media (
+  max-width: 576px
+) {
+  html,
+
+  html[data-text-size='standard'] {
+    font-size:
+      20px;
+  }
+
+
+  html[data-text-size='large'] {
+    font-size:
+      22px;
+  }
+
+
+  html[data-text-size='extra-large'] {
+    font-size:
+      24px;
+  }
 }

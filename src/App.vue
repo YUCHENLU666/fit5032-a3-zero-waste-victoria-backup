@@ -16,8 +16,13 @@ import AppNavbar
 import AppFooter
   from './components/AppFooter.vue'
 
+import AccessibilityPanel
+  from './components/AccessibilityPanel.vue'
 
-const route = useRoute()
+
+const route =
+  useRoute()
+
 
 const pageContent =
   ref(null)
@@ -29,33 +34,41 @@ const pageContent =
 //
 // Vue Router changes pages without reloading the browser.
 //
-// After navigation, keyboard and screen-reader users should
-// be informed that new page content is available.
+// After navigation, keyboard and screen-reader users
+// should be informed that new page content is available.
 //
-// We move focus to the new page's H1 after navigation.
+// Focus therefore moves to the new page's H1.
 // ======================================================
 
 watch(
-  () => route.fullPath,
+  () =>
+    route.fullPath,
 
   async () => {
     await nextTick()
 
+
     const pageHeading =
       pageContent.value
-        ?.querySelector('h1')
+        ?.querySelector(
+          'h1',
+        )
+
 
     if (!pageHeading) {
       return
     }
+
 
     pageHeading.setAttribute(
       'tabindex',
       '-1',
     )
 
+
     pageHeading.focus({
-      preventScroll: true,
+      preventScroll:
+        true,
     })
   },
 )
@@ -74,12 +87,6 @@ watch(
     <!-- ================================================= -->
     <!-- Skip navigation -->
     <!-- ================================================= -->
-    <!--
-      Hidden until focused with the keyboard.
-
-      Allows keyboard and screen-reader users
-      to bypass the navigation menu.
-    -->
 
     <a
       class="skip-link"
@@ -89,30 +96,46 @@ watch(
     </a>
 
 
+    <!-- ================================================= -->
+    <!-- Navigation -->
+    <!-- ================================================= -->
+
     <AppNavbar />
 
 
     <!-- ================================================= -->
     <!-- Route content -->
     <!-- ================================================= -->
-    <!--
-      This wrapper is intentionally NOT a <main> element.
-
-      Each route view contains its own semantic <main>,
-      preventing nested main landmarks.
-    -->
 
     <div
       id="main-content"
       ref="pageContent"
-      class="flex-grow-1"
+      class="
+        flex-grow-1
+      "
       tabindex="-1"
     >
       <RouterView />
     </div>
 
 
+    <!-- ================================================= -->
+    <!-- Footer -->
+    <!-- ================================================= -->
+
     <AppFooter />
+
+
+    <!-- ================================================= -->
+    <!-- Global accessibility preferences -->
+    <!-- ================================================= -->
+    <!--
+      Available on every page.
+
+      Does not require authentication.
+    -->
+
+    <AccessibilityPanel />
 
   </div>
 </template>
