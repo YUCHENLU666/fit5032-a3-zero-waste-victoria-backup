@@ -1,5 +1,6 @@
 <script setup>
 import {
+  computed,
   nextTick,
   ref,
 } from 'vue'
@@ -12,6 +13,7 @@ import {
 
 import {
   loginUser,
+  loginWithGoogle,
 } from '../services/authService'
 
 
@@ -39,9 +41,6 @@ const password =
 
 // ======================================================
 // Input references
-//
-// Used to move keyboard focus to the first invalid
-// field after validation fails.
 // ======================================================
 
 const emailInput =
@@ -67,6 +66,21 @@ const loginError =
 const isSubmitting =
   ref(false)
 
+const isGoogleSubmitting =
+  ref(false)
+
+
+// ======================================================
+// Prevent multiple authentication requests
+// ======================================================
+
+const isBusy =
+  computed(
+    () =>
+      isSubmitting.value ||
+      isGoogleSubmitting.value,
+  )
+
 
 // ======================================================
 // Registration success message
@@ -86,20 +100,28 @@ const successMessage =
 // ======================================================
 
 function clearErrors() {
-  emailError.value = ''
-  passwordError.value = ''
-  loginError.value = ''
+  emailError.value =
+    ''
+
+  passwordError.value =
+    ''
+
+  loginError.value =
+    ''
 }
 
 
 // ======================================================
-// Validate login form
+// Validate email/password form
 // ======================================================
 
 function validateForm() {
   clearErrors()
 
-  let isValid = true
+
+  let isValid =
+    true
+
 
   const cleanEmail =
     email.value.trim()
@@ -109,14 +131,18 @@ function validateForm() {
   // Email
   // --------------------------------------------------
 
-  if (!cleanEmail) {
+  if (
+    !cleanEmail
+  ) {
     emailError.value =
       'Please enter your email address.'
 
-    isValid = false
+    isValid =
+      false
   } else {
     const emailPattern =
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 
     if (
       !emailPattern.test(
@@ -126,7 +152,8 @@ function validateForm() {
       emailError.value =
         'Please enter a valid email address.'
 
-      isValid = false
+      isValid =
+        false
     }
   }
 
@@ -135,11 +162,14 @@ function validateForm() {
   // Password
   // --------------------------------------------------
 
-  if (!password.value) {
+  if (
+    !password.value
+  ) {
     passwordError.value =
       'Please enter your password.'
 
-    isValid = false
+    isValid =
+      false
   }
 
 
@@ -154,23 +184,95 @@ function validateForm() {
 async function focusFirstError() {
   await nextTick()
 
+
   if (
     emailError.value
   ) {
-    emailInput.value?.focus()
+    emailInput.value
+      ?.focus()
+
     return
   }
+
 
   if (
     passwordError.value
   ) {
-    passwordInput.value?.focus()
+    passwordInput.value
+      ?.focus()
   }
 }
 
 
 // ======================================================
-// Login
+// Redirect authenticated user
+// ======================================================
+//
+// The same redirect behaviour is used for:
+//
+// - Email/password login
+// - Google login
+//
+// Protected route requests are returned to the original
+// page. Administrators go to /admin. Normal users go to
+// /account.
+// ======================================================
+
+async function redirectAfterLogin(
+  user,
+) {
+  const redirectPath =
+    route.query.redirect
+
+
+  // --------------------------------------------------
+  // Original protected route
+  // --------------------------------------------------
+
+  if (
+    typeof redirectPath ===
+      'string' &&
+
+    redirectPath.startsWith(
+      '/',
+    )
+  ) {
+    await router.push(
+      redirectPath,
+    )
+
+    return
+  }
+
+
+  // --------------------------------------------------
+  // Administrator
+  // --------------------------------------------------
+
+  if (
+    user?.role ===
+    'admin'
+  ) {
+    await router.push(
+      '/admin',
+    )
+
+    return
+  }
+
+
+  // --------------------------------------------------
+  // Normal user
+  // --------------------------------------------------
+
+  await router.push(
+    '/account',
+  )
+}
+
+
+// ======================================================
+// Email/password login
 // ======================================================
 
 const handleLogin =
@@ -189,8 +291,12 @@ const handleLogin =
     const isValid =
       validateForm()
 
-    if (!isValid) {
+
+    if (
+      !isValid
+    ) {
       await focusFirstError()
+
       return
     }
 
@@ -206,6 +312,7 @@ const handleLogin =
     isSubmitting.value =
       true
 
+
     try {
       const result =
         await loginUser(
@@ -214,11 +321,9 @@ const handleLogin =
         )
 
 
-      // ------------------------------------------------
-      // Login failed
-      // ------------------------------------------------
-
-      if (!result.success) {
+      if (
+        !result.success
+      ) {
         loginError.value =
           result.message ||
           'Unable to log in. Please check your details and try again.'
@@ -227,53 +332,8 @@ const handleLogin =
       }
 
 
-      // ------------------------------------------------
-      // Protected-route redirect
-      //
-      // If the user originally attempted to access a
-      // protected route, return them there after login.
-      // ------------------------------------------------
-
-      const redirectPath =
-        route.query.redirect
-
-      if (
-        typeof redirectPath ===
-          'string' &&
-        redirectPath.startsWith(
-          '/',
-        )
-      ) {
-        await router.push(
-          redirectPath,
-        )
-
-        return
-      }
-
-
-      // ------------------------------------------------
-      // Administrator
-      // ------------------------------------------------
-
-      if (
-        result.user.role ===
-        'admin'
-      ) {
-        await router.push(
-          '/admin',
-        )
-
-        return
-      }
-
-
-      // ------------------------------------------------
-      // Normal user
-      // ------------------------------------------------
-
-      await router.push(
-        '/account',
+      await redirectAfterLogin(
+        result.user,
       )
     } catch (error) {
       console.error(
@@ -281,10 +341,62 @@ const handleLogin =
         error,
       )
 
+
       loginError.value =
         'Unable to log in. Please try again.'
     } finally {
       isSubmitting.value =
+        false
+    }
+  }
+
+
+// ======================================================
+// Google login
+// ======================================================
+
+const handleGoogleLogin =
+  async () => {
+    successMessage.value =
+      ''
+
+    clearErrors()
+
+
+    isGoogleSubmitting.value =
+      true
+
+
+    try {
+      const result =
+        await loginWithGoogle()
+
+
+      if (
+        !result.success
+      ) {
+        loginError.value =
+          result.message ||
+          'Unable to sign in with Google.'
+
+        return
+      }
+
+
+      await redirectAfterLogin(
+        result.user,
+      )
+    } catch (error) {
+      console.error(
+        'Google login failed:',
+        error,
+      )
+
+
+      loginError.value =
+        'Unable to sign in with Google. Please try again.'
+    } finally {
+      isGoogleSubmitting.value =
         false
     }
   }
@@ -299,8 +411,9 @@ const handleLogin =
     "
     aria-labelledby="login-title"
   >
-    <div class="container">
-
+    <div
+      class="container"
+    >
       <div
         class="
           row
@@ -314,7 +427,6 @@ const handleLogin =
             col-lg-5
           "
         >
-
           <div
             class="
               card
@@ -340,8 +452,6 @@ const handleLogin =
                   mb-4
                 "
               >
-
-                <!-- Decorative icon -->
                 <div
                   class="
                     fs-1
@@ -373,7 +483,6 @@ const handleLogin =
                   Log in to your
                   ZWV Circular Hub account.
                 </p>
-
               </div>
 
 
@@ -399,7 +508,7 @@ const handleLogin =
 
 
               <!-- ================================================= -->
-              <!-- Login/server error -->
+              <!-- Authentication error -->
               <!-- ================================================= -->
 
               <div
@@ -412,6 +521,7 @@ const handleLogin =
                 "
                 role="alert"
                 aria-live="assertive"
+                aria-atomic="true"
               >
                 {{
                   loginError
@@ -420,7 +530,7 @@ const handleLogin =
 
 
               <!-- ================================================= -->
-              <!-- Login form -->
+              <!-- Email/password login -->
               <!-- ================================================= -->
 
               <form
@@ -468,7 +578,9 @@ const handleLogin =
                   <input
                     id="email"
                     ref="emailInput"
-                    v-model="email"
+                    v-model="
+                      email
+                    "
                     type="email"
                     class="
                       form-control
@@ -491,6 +603,9 @@ const handleLogin =
                         ? 'login-email-help login-email-error'
                         : 'login-email-help'
                     "
+                    :disabled="
+                      isBusy
+                    "
                   />
 
 
@@ -502,6 +617,7 @@ const handleLogin =
                     class="
                       invalid-feedback
                     "
+                    role="alert"
                   >
                     {{
                       emailError
@@ -519,7 +635,6 @@ const handleLogin =
                     address associated
                     with your account.
                   </div>
-
                 </div>
 
 
@@ -561,7 +676,9 @@ const handleLogin =
                   <input
                     id="password"
                     ref="passwordInput"
-                    v-model="password"
+                    v-model="
+                      password
+                    "
                     type="password"
                     class="
                       form-control
@@ -584,6 +701,9 @@ const handleLogin =
                         ? 'login-password-help login-password-error'
                         : 'login-password-help'
                     "
+                    :disabled="
+                      isBusy
+                    "
                   />
 
 
@@ -595,6 +715,7 @@ const handleLogin =
                     class="
                       invalid-feedback
                     "
+                    role="alert"
                   >
                     {{
                       passwordError
@@ -611,12 +732,11 @@ const handleLogin =
                     Enter your account
                     password.
                   </div>
-
                 </div>
 
 
                 <!-- =============================================== -->
-                <!-- Submit -->
+                <!-- Email login button -->
                 <!-- =============================================== -->
 
                 <button
@@ -628,7 +748,7 @@ const handleLogin =
                     py-2
                   "
                   :disabled="
-                    isSubmitting
+                    isBusy
                   "
                   :aria-busy="
                     isSubmitting
@@ -653,12 +773,111 @@ const handleLogin =
                     Logging in...
                   </span>
 
-                  <span v-else>
+                  <span
+                    v-else
+                  >
                     Log In
                   </span>
                 </button>
-
               </form>
+
+
+              <!-- ================================================= -->
+              <!-- Divider -->
+              <!-- ================================================= -->
+
+              <div
+                class="
+                  login-divider
+                  my-4
+                "
+                aria-hidden="true"
+              >
+                <span>
+                  or
+                </span>
+              </div>
+
+
+              <!-- ================================================= -->
+              <!-- Google Sign-In -->
+              <!-- ================================================= -->
+
+              <button
+                type="button"
+                class="
+                  btn
+                  btn-outline-dark
+                  google-login-button
+                  w-100
+                  py-2
+                "
+                :disabled="
+                  isBusy
+                "
+                :aria-busy="
+                  isGoogleSubmitting
+                    ? 'true'
+                    : 'false'
+                "
+                @click="
+                  handleGoogleLogin
+                "
+              >
+                <span
+                  v-if="
+                    isGoogleSubmitting
+                  "
+                >
+                  <span
+                    class="
+                      spinner-border
+                      spinner-border-sm
+                      me-2
+                    "
+                    aria-hidden="true"
+                  ></span>
+
+                  Connecting to Google...
+                </span>
+
+
+                <span
+                  v-else
+                  class="
+                    d-inline-flex
+                    align-items-center
+                    justify-content-center
+                    gap-2
+                  "
+                >
+                  <span
+                    class="
+                      google-badge
+                    "
+                    aria-hidden="true"
+                  >
+                    G
+                  </span>
+
+                  Continue with Google
+                </span>
+              </button>
+
+
+              <p
+                class="
+                  small
+                  text-muted
+                  text-center
+                  mt-2
+                  mb-0
+                "
+              >
+                New Google users are
+                automatically registered
+                with a standard ZWV account.
+              </p>
 
 
               <hr
@@ -692,16 +911,15 @@ const handleLogin =
 
             </div>
           </div>
-
         </div>
       </div>
-
     </div>
   </main>
 </template>
 
 
 <style scoped>
+
 .card {
   border-radius:
     16px;
@@ -744,7 +962,101 @@ const handleLogin =
 
 
 /* ===================================================== */
-/* Button */
+/* Divider */
+/* ===================================================== */
+
+.login-divider {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    0.9rem;
+
+  color:
+    #6c757d;
+
+  font-size:
+    0.9rem;
+}
+
+
+.login-divider::before,
+.login-divider::after {
+  content:
+    '';
+
+  flex:
+    1;
+
+  height:
+    1px;
+
+  background-color:
+    #dee2e6;
+}
+
+
+/* ===================================================== */
+/* Google button */
+/* ===================================================== */
+
+.google-login-button {
+  min-height:
+    46px;
+
+  background-color:
+    #ffffff;
+}
+
+
+.google-login-button:hover:not(:disabled) {
+  background-color:
+    #f8f9fa;
+
+  color:
+    #212529;
+}
+
+
+.google-badge {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  width:
+    24px;
+
+  height:
+    24px;
+
+  border-radius:
+    50%;
+
+  background-color:
+    #ffffff;
+
+  border:
+    1px solid
+    #ced4da;
+
+  font-weight:
+    700;
+
+  line-height:
+    1;
+}
+
+
+/* ===================================================== */
+/* Buttons */
 /* ===================================================== */
 
 .btn {
@@ -758,4 +1070,25 @@ const handleLogin =
   transform:
     translateY(-1px);
 }
+
+
+/* ===================================================== */
+/* Reduced motion */
+/* ===================================================== */
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+  .btn {
+    transition:
+      none;
+  }
+
+
+  .btn:hover:not(:disabled) {
+    transform:
+      none;
+  }
+}
+
 </style>
