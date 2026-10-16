@@ -2,20 +2,36 @@
 import {
   computed,
   nextTick,
+  onMounted,
   ref,
 } from 'vue'
 
 import {
+  getEmailRecipients,
   sendEmail,
 } from '../services/emailService'
 
 
 // ======================================================
-// Form fields
+// Registered recipients
 // ======================================================
 
-const to =
+const recipients =
+  ref([])
+
+const recipientUid =
   ref('')
+
+const isLoadingRecipients =
+  ref(false)
+
+const recipientLoadError =
+  ref('')
+
+
+// ======================================================
+// Form fields
+// ======================================================
 
 const subject =
   ref('')
@@ -29,11 +45,9 @@ const selectedFile =
 
 // ======================================================
 // Input references
-//
-// Used to move keyboard focus to the first invalid field.
 // ======================================================
 
-const recipientInput =
+const recipientSelect =
   ref(null)
 
 const subjectInput =
@@ -64,7 +78,7 @@ const errorMessage =
 // Validation errors
 // ======================================================
 
-const toError =
+const recipientError =
   ref('')
 
 const subjectError =
@@ -90,13 +104,31 @@ const MAX_FILE_SIZE =
 // ======================================================
 
 const subjectLength =
-  computed(() =>
-    subject.value.length,
+  computed(
+    () =>
+      subject.value.length,
   )
 
 const messageLength =
-  computed(() =>
-    message.value.length,
+  computed(
+    () =>
+      message.value.length,
+  )
+
+
+// ======================================================
+// Selected recipient
+// ======================================================
+
+const selectedRecipient =
+  computed(
+    () => {
+      return recipients.value.find(
+        (recipient) =>
+          recipient.uid ===
+          recipientUid.value,
+      ) || null
+    },
   )
 
 
@@ -105,48 +137,56 @@ const messageLength =
 // ======================================================
 
 const selectedFileName =
-  computed(() =>
-    selectedFile.value
-      ? selectedFile.value.name
-      : '',
+  computed(
+    () =>
+      selectedFile.value
+        ? selectedFile.value.name
+        : '',
   )
 
 
 const selectedFileSize =
-  computed(() => {
-    if (
-      !selectedFile.value
-    ) {
-      return ''
-    }
+  computed(
+    () => {
+      if (
+        !selectedFile.value
+      ) {
+        return ''
+      }
 
-    return formatFileSize(
-      selectedFile.value.size,
-    )
-  })
+
+      return formatFileSize(
+        selectedFile.value.size,
+      )
+    },
+  )
 
 
 // ======================================================
-// File size formatting
+// Format file size
 // ======================================================
 
 function formatFileSize(
   bytes,
 ) {
   if (
-    bytes < 1024
+    bytes <
+    1024
   ) {
     return `${bytes} B`
   }
+
 
   if (
     bytes <
     1024 * 1024
   ) {
     return `${(
-      bytes / 1024
+      bytes /
+      1024
     ).toFixed(1)} KB`
   }
+
 
   return `${(
     bytes /
@@ -156,18 +196,70 @@ function formatFileSize(
 
 
 // ======================================================
-// Email validation
+// Load registered users
 // ======================================================
 
-function validateEmail(
-  email,
-) {
-  const pattern =
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+async function loadRecipients() {
+  recipientLoadError.value =
+    ''
 
-  return pattern.test(
-    email,
-  )
+  isLoadingRecipients.value =
+    true
+
+
+  try {
+    const result =
+      await getEmailRecipients()
+
+
+    recipients.value =
+      Array.isArray(
+        result,
+      )
+        ? result
+        : []
+
+
+    // --------------------------------------------------
+    // Selected user may no longer exist after refresh.
+    // --------------------------------------------------
+
+    if (
+      recipientUid.value &&
+      !recipients.value.some(
+        (recipient) =>
+          recipient.uid ===
+          recipientUid.value,
+      )
+    ) {
+      recipientUid.value =
+        ''
+    }
+  } catch (error) {
+    console.error(
+      'Unable to load registered email recipients:',
+      error,
+    )
+
+
+    recipients.value =
+      []
+
+
+    if (
+      error?.code ===
+      'functions/unauthenticated'
+    ) {
+      recipientLoadError.value =
+        'You must be signed in to load registered users.'
+    } else {
+      recipientLoadError.value =
+        'Unable to load registered users. Please try again.'
+    }
+  } finally {
+    isLoadingRecipients.value =
+      false
+  }
 }
 
 
@@ -176,10 +268,17 @@ function validateEmail(
 // ======================================================
 
 function clearValidationErrors() {
-  toError.value = ''
-  subjectError.value = ''
-  messageError.value = ''
-  fileError.value = ''
+  recipientError.value =
+    ''
+
+  subjectError.value =
+    ''
+
+  messageError.value =
+    ''
+
+  fileError.value =
+    ''
 }
 
 
@@ -190,11 +289,10 @@ function clearValidationErrors() {
 function validateForm() {
   clearValidationErrors()
 
-  let isValid = true
 
+  let isValid =
+    true
 
-  const trimmedTo =
-    to.value.trim()
 
   const trimmedSubject =
     subject.value.trim()
@@ -207,20 +305,22 @@ function validateForm() {
   // Recipient
   // --------------------------------------------------
 
-  if (!trimmedTo) {
-    toError.value =
-      'Recipient email is required.'
-
-    isValid = false
-  } else if (
-    !validateEmail(
-      trimmedTo,
-    )
+  if (
+    !recipientUid.value
   ) {
-    toError.value =
-      'Please enter a valid email address.'
+    recipientError.value =
+      'Please select a registered user.'
 
-    isValid = false
+    isValid =
+      false
+  } else if (
+    !selectedRecipient.value
+  ) {
+    recipientError.value =
+      'The selected recipient is no longer available.'
+
+    isValid =
+      false
   }
 
 
@@ -228,11 +328,14 @@ function validateForm() {
   // Subject
   // --------------------------------------------------
 
-  if (!trimmedSubject) {
+  if (
+    !trimmedSubject
+  ) {
     subjectError.value =
       'Subject is required.'
 
-    isValid = false
+    isValid =
+      false
   } else if (
     trimmedSubject.length >
     150
@@ -240,7 +343,8 @@ function validateForm() {
     subjectError.value =
       'Subject must not exceed 150 characters.'
 
-    isValid = false
+    isValid =
+      false
   }
 
 
@@ -248,11 +352,14 @@ function validateForm() {
   // Message
   // --------------------------------------------------
 
-  if (!trimmedMessage) {
+  if (
+    !trimmedMessage
+  ) {
     messageError.value =
       'Message is required.'
 
-    isValid = false
+    isValid =
+      false
   } else if (
     trimmedMessage.length >
     5000
@@ -260,7 +367,8 @@ function validateForm() {
     messageError.value =
       'Message must not exceed 5000 characters.'
 
-    isValid = false
+    isValid =
+      false
   }
 
 
@@ -276,7 +384,8 @@ function validateForm() {
     fileError.value =
       'Attachment must be smaller than 2 MB.'
 
-    isValid = false
+    isValid =
+      false
   }
 
 
@@ -293,9 +402,9 @@ async function focusFirstError() {
 
 
   if (
-    toError.value
+    recipientError.value
   ) {
-    recipientInput.value
+    recipientSelect.value
       ?.focus()
 
     return
@@ -338,7 +447,9 @@ async function focusFirstError() {
 async function handleFileChange(
   event,
 ) {
-  fileError.value = ''
+  fileError.value =
+    ''
+
 
   const file =
     event.target.files?.[0]
@@ -359,6 +470,7 @@ async function handleFileChange(
     fileError.value =
       'Attachment must be smaller than 2 MB.'
 
+
     selectedFile.value =
       null
 
@@ -373,8 +485,10 @@ async function handleFileChange(
 
     await nextTick()
 
+
     fileInput.value
       ?.focus()
+
 
     return
   }
@@ -392,6 +506,7 @@ async function handleFileChange(
 function removeFile() {
   selectedFile.value =
     null
+
 
   fileError.value =
     ''
@@ -415,9 +530,14 @@ function removeFile() {
 // ======================================================
 
 function resetForm() {
-  to.value = ''
-  subject.value = ''
-  message.value = ''
+  recipientUid.value =
+    ''
+
+  subject.value =
+    ''
+
+  message.value =
+    ''
 
   selectedFile.value =
     null
@@ -448,6 +568,27 @@ function getErrorMessage(
   ) {
     return (
       'You must be signed in to send an email.'
+    )
+  }
+
+
+  if (
+    error?.code ===
+    'functions/not-found'
+  ) {
+    return (
+      'The selected recipient is not a registered ZWV Circular Hub user.'
+    )
+  }
+
+
+  if (
+    error?.code ===
+    'functions/failed-precondition'
+  ) {
+    return (
+      error.message ||
+      'The selected recipient account is unavailable.'
     )
   }
 
@@ -509,7 +650,15 @@ async function handleSubmit() {
 
 
   // --------------------------------------------------
-  // Send email
+  // Keep selected recipient for success message
+  // --------------------------------------------------
+
+  const recipient =
+    selectedRecipient.value
+
+
+  // --------------------------------------------------
+  // Send
   // --------------------------------------------------
 
   isSending.value =
@@ -519,8 +668,8 @@ async function handleSubmit() {
   try {
     const result =
       await sendEmail({
-        to:
-          to.value.trim(),
+        recipientUid:
+          recipientUid.value,
 
         subject:
           subject.value.trim(),
@@ -533,10 +682,18 @@ async function handleSubmit() {
       })
 
 
-    successMessage.value =
+    if (recipient) {
+      successMessage.value =
+        `Email sent successfully to ${recipient.username} (${recipient.email}).`
+    } else if (
       result?.emailId
-        ? `Email sent successfully. Email ID: ${result.emailId}`
-        : 'Email sent successfully.'
+    ) {
+      successMessage.value =
+        `Email sent successfully. Email ID: ${result.emailId}`
+    } else {
+      successMessage.value =
+        'Email sent successfully.'
+    }
 
 
     resetForm()
@@ -556,6 +713,17 @@ async function handleSubmit() {
       false
   }
 }
+
+
+// ======================================================
+// Initial recipient load
+// ======================================================
+
+onMounted(
+  async () => {
+    await loadRecipients()
+  },
+)
 </script>
 
 
@@ -593,7 +761,6 @@ async function handleSubmit() {
               mb-4
             "
           >
-
             <p
               class="
                 email-eyebrow
@@ -623,16 +790,16 @@ async function handleSubmit() {
               "
             >
               Send a message securely
-              through our Firebase
-              Cloud Function and Resend
-              email service.
+              to another registered
+              ZWV Circular Hub user
+              through Firebase Cloud
+              Functions and Resend.
             </p>
-
           </div>
 
 
           <!-- ================================================= -->
-          <!-- Success feedback -->
+          <!-- Success -->
           <!-- ================================================= -->
 
           <div
@@ -654,7 +821,7 @@ async function handleSubmit() {
 
 
           <!-- ================================================= -->
-          <!-- Server / network error -->
+          <!-- Email error -->
           <!-- ================================================= -->
 
           <div
@@ -672,6 +839,57 @@ async function handleSubmit() {
             {{
               errorMessage
             }}
+          </div>
+
+
+          <!-- ================================================= -->
+          <!-- Recipient loading error -->
+          <!-- ================================================= -->
+
+          <div
+            v-if="
+              recipientLoadError
+            "
+            class="
+              alert
+              alert-warning
+            "
+            role="alert"
+          >
+            <div
+              class="
+                d-flex
+                flex-column
+                flex-sm-row
+                align-items-sm-center
+                justify-content-between
+                gap-3
+              "
+            >
+              <span>
+                {{
+                  recipientLoadError
+                }}
+              </span>
+
+
+              <button
+                type="button"
+                class="
+                  btn
+                  btn-sm
+                  btn-outline-dark
+                "
+                :disabled="
+                  isLoadingRecipients
+                "
+                @click="
+                  loadRecipients
+                "
+              >
+                Try Again
+              </button>
+            </div>
           </div>
 
 
@@ -704,66 +922,133 @@ async function handleSubmit() {
                 <div
                   class="mb-4"
                 >
-
-                  <label
-                    for="email-recipient"
+                  <div
                     class="
-                      form-label
-                      fw-semibold
+                      d-flex
+                      justify-content-between
+                      align-items-center
+                      gap-3
+                      mb-1
                     "
                   >
-                    Recipient Email
-
-                    <span
+                    <label
+                      for="email-recipient"
                       class="
-                        text-danger
-                      "
-                      aria-hidden="true"
-                    >
-                      *
-                    </span>
-
-                    <span
-                      class="
-                        visually-hidden
+                        form-label
+                        fw-semibold
+                        mb-0
                       "
                     >
-                      required
-                    </span>
-                  </label>
+                      Registered User
+
+                      <span
+                        class="
+                          text-danger
+                        "
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+
+                      <span
+                        class="
+                          visually-hidden
+                        "
+                      >
+                        required
+                      </span>
+                    </label>
 
 
-                  <input
+                    <button
+                      type="button"
+                      class="
+                        btn
+                        btn-sm
+                        btn-outline-secondary
+                      "
+                      :disabled="
+                        isLoadingRecipients ||
+                        isSending
+                      "
+                      @click="
+                        loadRecipients
+                      "
+                    >
+                      {{
+                        isLoadingRecipients
+                          ? 'Loading...'
+                          : 'Refresh Users'
+                      }}
+                    </button>
+                  </div>
+
+
+                  <select
                     id="email-recipient"
-                    ref="recipientInput"
-                    v-model="to"
-                    type="email"
+                    ref="recipientSelect"
+                    v-model="
+                      recipientUid
+                    "
                     class="
-                      form-control
-                      form-control-lg
+                      form-select
+                      form-select-lg
                     "
                     :class="{
                       'is-invalid':
-                        toError,
+                        recipientError,
                     }"
-                    placeholder="recipient@example.com"
-                    autocomplete="email"
                     required
                     aria-required="true"
                     :aria-invalid="
-                      toError
+                      recipientError
                         ? 'true'
                         : 'false'
                     "
                     :aria-describedby="
-                      toError
+                      recipientError
                         ? 'recipient-help recipient-error'
                         : 'recipient-help'
                     "
                     :disabled="
-                      isSending
+                      isSending ||
+                      isLoadingRecipients ||
+                      recipients.length === 0
                     "
-                  />
+                  >
+                    <option
+                      value=""
+                      disabled
+                    >
+                      {{
+                        isLoadingRecipients
+                          ? 'Loading registered users...'
+                          : 'Select a registered user'
+                      }}
+                    </option>
+
+
+                    <option
+                      v-for="
+                        recipient in
+                        recipients
+                      "
+                      :key="
+                        recipient.uid
+                      "
+                      :value="
+                        recipient.uid
+                      "
+                    >
+                      {{
+                        recipient.username
+                      }}
+                      —
+                      {{
+                        recipient.email
+                      }}
+                    </option>
+                  </select>
 
 
                   <div
@@ -772,27 +1057,89 @@ async function handleSubmit() {
                       form-text
                     "
                   >
-                    Enter the email
-                    address that should
-                    receive the message.
+                    Emails can only be
+                    sent to users who
+                    are registered with
+                    ZWV Circular Hub.
                   </div>
 
 
                   <div
                     v-if="
-                      toError
+                      recipientError
                     "
                     id="recipient-error"
                     class="
                       invalid-feedback
+                      d-block
                     "
                     role="alert"
                   >
                     {{
-                      toError
+                      recipientError
                     }}
                   </div>
 
+
+                  <div
+                    v-if="
+                      !isLoadingRecipients &&
+                      !recipientLoadError &&
+                      recipients.length === 0
+                    "
+                    class="
+                      small
+                      text-secondary
+                      mt-2
+                    "
+                    role="status"
+                  >
+                    No registered recipients
+                    are currently available.
+                  </div>
+
+
+                  <div
+                    v-if="
+                      selectedRecipient
+                    "
+                    class="
+                      recipient-preview
+                      mt-3
+                    "
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span
+                      class="
+                        small
+                        text-secondary
+                      "
+                    >
+                      Selected recipient
+                    </span>
+
+                    <div
+                      class="
+                        fw-semibold
+                      "
+                    >
+                      {{
+                        selectedRecipient.username
+                      }}
+                    </div>
+
+                    <div
+                      class="
+                        small
+                        text-secondary
+                      "
+                    >
+                      {{
+                        selectedRecipient.email
+                      }}
+                    </div>
+                  </div>
                 </div>
 
 
@@ -803,7 +1150,6 @@ async function handleSubmit() {
                 <div
                   class="mb-4"
                 >
-
                   <div
                     class="
                       d-flex
@@ -812,7 +1158,6 @@ async function handleSubmit() {
                       gap-3
                     "
                   >
-
                     <label
                       for="email-subject"
                       class="
@@ -851,14 +1196,15 @@ async function handleSubmit() {
                         subjectLength
                       }}/150
                     </small>
-
                   </div>
 
 
                   <input
                     id="email-subject"
                     ref="subjectInput"
-                    v-model="subject"
+                    v-model="
+                      subject
+                    "
                     type="text"
                     maxlength="150"
                     class="
@@ -912,7 +1258,6 @@ async function handleSubmit() {
                       subjectError
                     }}
                   </div>
-
                 </div>
 
 
@@ -923,7 +1268,6 @@ async function handleSubmit() {
                 <div
                   class="mb-4"
                 >
-
                   <div
                     class="
                       d-flex
@@ -932,7 +1276,6 @@ async function handleSubmit() {
                       gap-3
                     "
                   >
-
                     <label
                       for="email-message"
                       class="
@@ -971,14 +1314,15 @@ async function handleSubmit() {
                         messageLength
                       }}/5000
                     </small>
-
                   </div>
 
 
                   <textarea
                     id="email-message"
                     ref="messageInput"
-                    v-model="message"
+                    v-model="
+                      message
+                    "
                     rows="8"
                     maxlength="5000"
                     class="
@@ -1032,7 +1376,6 @@ async function handleSubmit() {
                       messageError
                     }}
                   </div>
-
                 </div>
 
 
@@ -1043,7 +1386,6 @@ async function handleSubmit() {
                 <div
                   class="mb-4"
                 >
-
                   <label
                     for="email-attachment"
                     class="
@@ -1103,7 +1445,6 @@ async function handleSubmit() {
                   >
                     Maximum file size:
                     2 MB.
-
                     Supported examples:
                     PDF, Word, text and
                     image files.
@@ -1141,9 +1482,7 @@ async function handleSubmit() {
                     role="status"
                     aria-live="polite"
                   >
-
                     <div>
-
                       <div
                         class="
                           fw-semibold
@@ -1164,7 +1503,6 @@ async function handleSubmit() {
                           selectedFileSize
                         }}
                       </small>
-
                     </div>
 
 
@@ -1187,9 +1525,7 @@ async function handleSubmit() {
                     >
                       Remove
                     </button>
-
                   </div>
-
                 </div>
 
 
@@ -1212,7 +1548,6 @@ async function handleSubmit() {
                     align-items-sm-center
                   "
                 >
-
                   <p
                     class="
                       small
@@ -1239,7 +1574,6 @@ async function handleSubmit() {
                       gap-2
                     "
                   >
-
                     <button
                       type="button"
                       class="
@@ -1265,7 +1599,9 @@ async function handleSubmit() {
                         px-4
                       "
                       :disabled="
-                        isSending
+                        isSending ||
+                        isLoadingRecipients ||
+                        recipients.length === 0
                       "
                       :aria-busy="
                         isSending
@@ -1273,7 +1609,6 @@ async function handleSubmit() {
                           : 'false'
                       "
                     >
-
                       <span
                         v-if="
                           isSending
@@ -1286,21 +1621,15 @@ async function handleSubmit() {
                         aria-hidden="true"
                       ></span>
 
-
                       {{
                         isSending
                           ? 'Sending...'
                           : 'Send Email'
                       }}
-
                     </button>
-
                   </div>
-
                 </div>
-
               </form>
-
             </div>
           </div>
 
@@ -1316,7 +1645,6 @@ async function handleSubmit() {
             "
             aria-labelledby="email-security-title"
           >
-
             <h2
               id="email-security-title"
               class="
@@ -1325,7 +1653,7 @@ async function handleSubmit() {
                 mb-1
               "
             >
-              Secure email delivery
+              Registered users only
             </h2>
 
 
@@ -1336,16 +1664,23 @@ async function handleSubmit() {
                 mb-0
               "
             >
-              Emails are processed
-              through a protected
-              Firebase Cloud Function.
+              Recipients are loaded from
+              registered ZWV Circular Hub
+              accounts.
 
-              The Resend API key is
-              stored securely in Firebase
-              Secret Manager and is never
-              exposed to the browser.
+              The browser sends only the
+              selected user's UID.
+
+              The Firebase Cloud Function
+              verifies the account again
+              and resolves the real email
+              address on the server before
+              sending.
+
+              The Resend API key remains
+              securely stored in Firebase
+              Secret Manager.
             </p>
-
           </aside>
 
         </div>
@@ -1390,17 +1725,13 @@ async function handleSubmit() {
   letter-spacing:
     0.14em;
 
-  /*
-    Darker green improves
-    contrast on light backgrounds.
-  */
   color:
     #146c43;
 }
 
 
 /* ===================================================== */
-/* Email card */
+/* Card */
 /* ===================================================== */
 
 .email-card {
@@ -1422,13 +1753,15 @@ async function handleSubmit() {
 /* Form controls */
 /* ===================================================== */
 
-.form-control {
+.form-control,
+.form-select {
   border-radius:
     10px;
 }
 
 
-.form-control:focus {
+.form-control:focus,
+.form-select:focus {
   border-color:
     #198754;
 
@@ -1443,7 +1776,8 @@ async function handleSubmit() {
 }
 
 
-.form-control.is-invalid:focus {
+.form-control.is-invalid:focus,
+.form-select.is-invalid:focus {
   box-shadow:
     0 0 0 0.2rem
     rgba(
@@ -1452,6 +1786,26 @@ async function handleSubmit() {
       69,
       0.18
     );
+}
+
+
+/* ===================================================== */
+/* Recipient preview */
+/* ===================================================== */
+
+.recipient-preview {
+  padding:
+    0.8rem 1rem;
+
+  background-color:
+    #f8f9fa;
+
+  border:
+    1px solid
+    #dee2e6;
+
+  border-radius:
+    10px;
 }
 
 
@@ -1513,7 +1867,7 @@ async function handleSubmit() {
 
 
 /* ===================================================== */
-/* Message area */
+/* Message */
 /* ===================================================== */
 
 textarea {
@@ -1526,7 +1880,7 @@ textarea {
 
 
 /* ===================================================== */
-/* Reduced motion fallback */
+/* Reduced motion */
 /* ===================================================== */
 
 @media (
@@ -1554,4 +1908,5 @@ textarea {
       1.5rem !important;
   }
 }
+
 </style>
