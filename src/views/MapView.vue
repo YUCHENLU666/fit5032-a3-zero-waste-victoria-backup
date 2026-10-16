@@ -23,6 +23,10 @@ import {
   travelModes,
 } from '../services/mapService.js'
 
+import {
+  calculateRouteSustainability,
+} from '../services/sustainabilityService.js'
+
 
 // ======================================================
 // Map configuration
@@ -89,6 +93,51 @@ const statusMessage =
 
 
 // ======================================================
+// Green Route Analysis state
+// ======================================================
+//
+// Mapbox provides:
+//
+// - Distance
+// - Duration
+// - Route geometry
+//
+// Firebase Cloud Functions then provides:
+//
+// - Estimated direct travel emissions
+// - Eco Score
+// - Sustainability level
+// - Greener alternative
+// - Potential emissions saving
+// ======================================================
+
+const sustainabilityInfo =
+  ref(null)
+
+const isAnalysingSustainability =
+  ref(false)
+
+const sustainabilityError =
+  ref('')
+
+
+// ======================================================
+// Reset sustainability result
+// ======================================================
+
+function resetSustainability() {
+  sustainabilityInfo.value =
+    null
+
+  sustainabilityError.value =
+    ''
+
+  isAnalysingSustainability.value =
+    false
+}
+
+
+// ======================================================
 // Reduced motion
 // ======================================================
 
@@ -115,10 +164,12 @@ function moveMapTo({
     return
   }
 
+
   const center = [
     longitude,
     latitude,
   ]
+
 
   if (
     prefersReducedMotion()
@@ -131,10 +182,12 @@ function moveMapTo({
     return
   }
 
+
   map.flyTo({
     center,
     zoom,
-    essential: false,
+    essential:
+      false,
   })
 }
 
@@ -144,34 +197,39 @@ function moveMapTo({
 // ======================================================
 
 const filteredLocations =
-  computed(() => {
-    const term =
-      searchTerm.value
-        .trim()
-        .toLowerCase()
-
-    if (!term) {
-      return recyclingLocations
-    }
-
-    return recyclingLocations.filter(
-      (location) => {
-        const searchableText = [
-          location.name,
-          location.suburb,
-          location.postcode,
-          location.status,
-          ...location.acceptedMaterials,
-        ]
-          .join(' ')
+  computed(
+    () => {
+      const term =
+        searchTerm.value
+          .trim()
           .toLowerCase()
 
-        return searchableText.includes(
-          term,
-        )
-      },
-    )
-  })
+
+      if (!term) {
+        return recyclingLocations
+      }
+
+
+      return recyclingLocations.filter(
+        (location) => {
+          const searchableText = [
+            location.name,
+            location.suburb,
+            location.postcode,
+            location.status,
+            ...location.acceptedMaterials,
+          ]
+            .join(' ')
+            .toLowerCase()
+
+
+          return searchableText.includes(
+            term,
+          )
+        },
+      )
+    },
+  )
 
 
 // ======================================================
@@ -179,34 +237,43 @@ const filteredLocations =
 // ======================================================
 
 const selectedMaterials =
-  computed(() => {
-    if (
-      !selectedLocation.value
-    ) {
-      return ''
-    }
+  computed(
+    () => {
+      if (
+        !selectedLocation.value
+      ) {
+        return ''
+      }
 
-    return (
-      selectedLocation.value
-        .acceptedMaterials
-        .join(', ')
-    )
-  })
+
+      return (
+        selectedLocation.value
+          .acceptedMaterials
+          .join(', ')
+      )
+    },
+  )
 
 
 const selectedCoordinates =
-  computed(() => {
-    if (
-      !selectedLocation.value
-    ) {
-      return ''
-    }
+  computed(
+    () => {
+      if (
+        !selectedLocation.value
+      ) {
+        return ''
+      }
 
-    return [
-      selectedLocation.value.latitude,
-      selectedLocation.value.longitude,
-    ].join(', ')
-  })
+
+      return [
+        selectedLocation.value
+          .latitude,
+
+        selectedLocation.value
+          .longitude,
+      ].join(', ')
+    },
+  )
 
 
 // ======================================================
@@ -214,8 +281,11 @@ const selectedCoordinates =
 // ======================================================
 
 function clearMessages() {
-  errorMessage.value = ''
-  statusMessage.value = ''
+  errorMessage.value =
+    ''
+
+  statusMessage.value =
+    ''
 }
 
 
@@ -223,22 +293,10 @@ function clearMessages() {
 // Visual map markers
 // ======================================================
 //
-// Every recycling location already appears as a proper,
-// keyboard-accessible button in the Search Results list.
+// Recycling locations are also available through the
+// keyboard-accessible search result buttons.
 //
-// The pins on the Mapbox canvas therefore act as visual
-// duplicates rather than additional controls.
-//
-// This prevents dozens of closely packed map pins from
-// creating overlapping touch targets and an unnecessarily
-// long keyboard tab order.
-//
-// Users can:
-// - Search locations from the accessible list.
-// - Select a destination from the accessible list.
-// - Move the map to the selected destination.
-// - Use geolocation.
-// - Plan driving/walking/cycling routes.
+// Mapbox markers therefore act as visual duplicates.
 // ======================================================
 
 function configureMarkerAsVisualDuplicate(
@@ -247,31 +305,34 @@ function configureMarkerAsVisualDuplicate(
   const element =
     marker.getElement()
 
+
   element.setAttribute(
     'aria-hidden',
     'true',
   )
+
 
   element.setAttribute(
     'tabindex',
     '-1',
   )
 
+
   element.removeAttribute(
     'role',
   )
+
 
   element.removeAttribute(
     'aria-label',
   )
 
+
   element.removeAttribute(
     'aria-expanded',
   )
 
-  // Marker is visual only.
-  // All destination interaction occurs through
-  // the accessible Search Results buttons.
+
   element.style.pointerEvents =
     'none'
 }
@@ -285,6 +346,7 @@ function addLocationMarkers() {
   if (!map) {
     return
   }
+
 
   recyclingLocations.forEach(
     (location) => {
@@ -304,9 +366,11 @@ function addLocationMarkers() {
             map,
           )
 
+
       configureMarkerAsVisualDuplicate(
         marker,
       )
+
 
       locationMarkers.set(
         location.id,
@@ -327,13 +391,21 @@ function selectLocation(
 ) {
   clearMessages()
 
+
   selectedLocation.value =
     location
+
+
+  // A different destination requires
+  // a new route and sustainability analysis.
 
   routeInfo.value =
     null
 
+  resetSustainability()
+
   clearRoute()
+
 
   if (
     moveMap &&
@@ -351,6 +423,7 @@ function selectLocation(
     })
   }
 
+
   statusMessage.value =
     `${location.name} selected as the destination.`
 }
@@ -363,20 +436,27 @@ function selectLocation(
 async function handleUseMyLocation() {
   clearMessages()
 
+
   isLocating.value =
     true
+
 
   try {
     const location =
       await getCurrentLocation()
 
+
     userLocation.value =
       location
 
+
     if (userMarker) {
       userMarker.remove()
-      userMarker = null
+
+      userMarker =
+        null
     }
+
 
     userMarker =
       new mapboxgl.Marker({
@@ -391,9 +471,11 @@ async function handleUseMyLocation() {
           map,
         )
 
+
     configureMarkerAsVisualDuplicate(
       userMarker,
     )
+
 
     moveMapTo({
       longitude:
@@ -406,11 +488,18 @@ async function handleUseMyLocation() {
         13,
     })
 
+
     statusMessage.value =
       'Your current location has been added to the map.'
 
+
+    // A changed starting point requires
+    // route recalculation.
+
     routeInfo.value =
       null
+
+    resetSustainability()
 
     clearRoute()
   } catch (error) {
@@ -418,6 +507,7 @@ async function handleUseMyLocation() {
       'Geolocation failed:',
       error,
     )
+
 
     errorMessage.value =
       error?.message ||
@@ -441,6 +531,7 @@ function clearRoute() {
     return
   }
 
+
   if (
     map.getLayer(
       ROUTE_LAYER_ID,
@@ -450,6 +541,7 @@ function clearRoute() {
       ROUTE_LAYER_ID,
     )
   }
+
 
   if (
     map.getSource(
@@ -477,7 +569,9 @@ function drawRoute(
     return
   }
 
+
   clearRoute()
+
 
   map.addSource(
     ROUTE_SOURCE_ID,
@@ -496,6 +590,7 @@ function drawRoute(
       },
     },
   )
+
 
   map.addLayer({
     id:
@@ -543,8 +638,10 @@ function fitMapToRoute(
     return
   }
 
+
   const coordinates =
     geometry.coordinates
+
 
   if (
     coordinates.length ===
@@ -552,6 +649,7 @@ function fitMapToRoute(
   ) {
     return
   }
+
 
   const bounds =
     coordinates.reduce(
@@ -569,6 +667,7 @@ function fitMapToRoute(
         coordinates[0],
       ),
     )
+
 
   map.fitBounds(
     bounds,
@@ -589,11 +688,92 @@ function fitMapToRoute(
 
 
 // ======================================================
+// Green Route Analysis
+// ======================================================
+//
+// Mapbox returns the route first.
+//
+// The route's travel mode, distance and duration are then
+// sent to the third independent Firebase Cloud Function:
+//
+// calculateRouteSustainability
+//
+// This keeps the environmental calculation on the
+// server rather than inside the Vue component.
+// ======================================================
+
+async function analyseRouteSustainability(
+  route,
+) {
+  sustainabilityInfo.value =
+    null
+
+  sustainabilityError.value =
+    ''
+
+  isAnalysingSustainability.value =
+    true
+
+
+  try {
+    const response =
+      await calculateRouteSustainability({
+        travelMode:
+          route.profile,
+
+        // IMPORTANT:
+        //
+        // mapService.js returns these fields as:
+        //
+        // distanceMetres
+        // durationSeconds
+
+        distanceMeters:
+          route.distanceMetres,
+
+        durationSeconds:
+          route.durationSeconds,
+      })
+
+
+    if (
+      response.success
+    ) {
+      sustainabilityInfo.value =
+        response.data
+
+      return
+    }
+
+
+    sustainabilityError.value =
+      response.message ||
+      'Unable to analyse route sustainability.'
+  } catch (error) {
+    console.error(
+      'Route sustainability analysis failed:',
+      error,
+    )
+
+
+    sustainabilityError.value =
+      'The route was calculated successfully, but sustainability analysis is temporarily unavailable.'
+  } finally {
+    isAnalysingSustainability.value =
+      false
+  }
+}
+
+
+// ======================================================
 // Plan route
 // ======================================================
 
 async function handlePlanRoute() {
   clearMessages()
+
+  resetSustainability()
+
 
   // --------------------------------------------------
   // Require user location
@@ -608,6 +788,7 @@ async function handlePlanRoute() {
     return
   }
 
+
   // --------------------------------------------------
   // Require destination
   // --------------------------------------------------
@@ -621,10 +802,16 @@ async function handlePlanRoute() {
     return
   }
 
+
   isRouting.value =
     true
 
+
   try {
+    // ==================================================
+    // 1. Mapbox route calculation
+    // ==================================================
+
     const route =
       await getDirections({
         origin: {
@@ -651,24 +838,54 @@ async function handlePlanRoute() {
           travelMode.value,
       })
 
+
+    // ==================================================
+    // 2. Store route result
+    // ==================================================
+
     routeInfo.value =
       route
+
+
+    // ==================================================
+    // 3. Draw Mapbox route
+    // ==================================================
 
     drawRoute(
       route.geometry,
     )
 
+
     fitMapToRoute(
       route.geometry,
     )
 
+
     statusMessage.value =
       `Route to ${selectedLocation.value.name} calculated successfully.`
+
+
+    // Mapbox work is complete.
+    // Allow the Plan Route button to leave its routing
+    // state while Firebase performs the second analysis.
+
+    isRouting.value =
+      false
+
+
+    // ==================================================
+    // 4. Firebase sustainability analysis
+    // ==================================================
+
+    await analyseRouteSustainability(
+      route,
+    )
   } catch (error) {
     console.error(
       'Route calculation failed:',
       error,
     )
+
 
     errorMessage.value =
       error?.message ||
@@ -687,16 +904,24 @@ async function handlePlanRoute() {
 function clearSelection() {
   clearMessages()
 
+
   selectedLocation.value =
     null
+
 
   routeInfo.value =
     null
 
+
   searchTerm.value =
     ''
 
+
+  resetSustainability()
+
+
   clearRoute()
+
 
   statusMessage.value =
     'Destination selection cleared.'
@@ -718,10 +943,13 @@ onMounted(
       return
     }
 
+
     mapboxgl.accessToken =
       MAPBOX_ACCESS_TOKEN
 
+
     await nextTick()
+
 
     if (
       !mapContainer.value
@@ -731,6 +959,7 @@ onMounted(
 
       return
     }
+
 
     map =
       new mapboxgl.Map({
@@ -749,6 +978,7 @@ onMounted(
           10.5,
       })
 
+
     // --------------------------------------------------
     // Navigation controls
     // --------------------------------------------------
@@ -758,6 +988,7 @@ onMounted(
 
       'top-right',
     )
+
 
     // --------------------------------------------------
     // Scale
@@ -775,6 +1006,7 @@ onMounted(
       'bottom-left',
     )
 
+
     // --------------------------------------------------
     // Map ready
     // --------------------------------------------------
@@ -788,6 +1020,7 @@ onMounted(
         addLocationMarkers()
       },
     )
+
 
     map.on(
       'error',
@@ -815,17 +1048,25 @@ onUnmounted(
       },
     )
 
+
     locationMarkers.clear()
+
 
     if (userMarker) {
       userMarker.remove()
-      userMarker = null
+
+      userMarker =
+        null
     }
+
 
     if (map) {
       map.remove()
-      map = null
+
+      map =
+        null
     }
+
 
     mapReady.value =
       false
@@ -896,6 +1137,10 @@ onUnmounted(
           use your current position and
           calculate a driving, walking
           or cycling route.
+
+          Each calculated route also
+          receives a sustainability
+          analysis from Firebase.
         </p>
 
       </div>
@@ -910,7 +1155,9 @@ onUnmounted(
       class="py-5"
       aria-labelledby="map-tools-title"
     >
-      <div class="container">
+      <div
+        class="container"
+      >
 
         <h2
           id="map-tools-title"
@@ -992,7 +1239,9 @@ onUnmounted(
               <!-- POI search -->
               <!-- ============================================= -->
 
-              <div class="mb-4">
+              <div
+                class="mb-4"
+              >
 
                 <label
                   for="poi-search"
@@ -1079,7 +1328,8 @@ onUnmounted(
                   }}
 
                   {{
-                    filteredLocations.length === 1
+                    filteredLocations.length ===
+                      1
                       ? 'location'
                       : 'locations'
                   }}
@@ -1246,7 +1496,9 @@ onUnmounted(
                   </template>
 
 
-                  <template v-else>
+                  <template
+                    v-else
+                  >
                     <span
                       aria-hidden="true"
                     >
@@ -1349,6 +1601,7 @@ onUnmounted(
                       "
                     />
 
+
                     <span>
                       {{
                         mode.label
@@ -1375,10 +1628,12 @@ onUnmounted(
                   mb-2
                 "
                 :disabled="
-                  isRouting
+                  isRouting ||
+                  isAnalysingSustainability
                 "
                 :aria-busy="
-                  isRouting
+                  isRouting ||
+                  isAnalysingSustainability
                     ? 'true'
                     : 'false'
                 "
@@ -1405,7 +1660,27 @@ onUnmounted(
                 </template>
 
 
-                <template v-else>
+                <template
+                  v-else-if="
+                    isAnalysingSustainability
+                  "
+                >
+                  <span
+                    class="
+                      spinner-border
+                      spinner-border-sm
+                      me-2
+                    "
+                    aria-hidden="true"
+                  ></span>
+
+                  Analysing Route...
+                </template>
+
+
+                <template
+                  v-else
+                >
                   Plan Route
                 </template>
 
@@ -1595,8 +1870,9 @@ onUnmounted(
                 "
               >
 
-                <div class="col-6">
-
+                <div
+                  class="col-6"
+                >
                   <div
                     class="
                       route-stat
@@ -1626,12 +1902,12 @@ onUnmounted(
                     </span>
 
                   </div>
-
                 </div>
 
 
-                <div class="col-6">
-
+                <div
+                  class="col-6"
+                >
                   <div
                     class="
                       route-stat
@@ -1661,7 +1937,6 @@ onUnmounted(
                     </span>
 
                   </div>
-
                 </div>
 
               </div>
@@ -1677,12 +1952,431 @@ onUnmounted(
               >
                 Travel mode:
 
-                <strong>
+                <strong
+                  class="
+                    text-capitalize
+                  "
+                >
                   {{
                     routeInfo.profile
                   }}
                 </strong>
               </p>
+
+            </section>
+
+
+            <!-- ================================================= -->
+            <!-- Green Route Analysis -->
+            <!-- ================================================= -->
+
+            <section
+              v-if="
+                routeInfo
+              "
+              class="
+                green-route-card
+                mt-4
+                p-4
+              "
+              aria-labelledby="green-route-title"
+            >
+
+              <p
+                class="
+                  section-label
+                  mb-2
+                "
+              >
+                GREEN ROUTE ANALYSIS
+              </p>
+
+
+              <div
+                class="
+                  d-flex
+                  align-items-start
+                  gap-3
+                  mb-3
+                "
+              >
+
+                <span
+                  class="
+                    green-route-icon
+                  "
+                  aria-hidden="true"
+                >
+                  🌱
+                </span>
+
+
+                <div>
+                  <h2
+                    id="green-route-title"
+                    class="
+                      h5
+                      fw-bold
+                      mb-1
+                    "
+                  >
+                    Route Sustainability
+                  </h2>
+
+
+                  <p
+                    class="
+                      small
+                      text-secondary
+                      mb-0
+                    "
+                  >
+                    Analysed by Firebase
+                    Cloud Functions.
+                  </p>
+                </div>
+
+              </div>
+
+
+              <!-- ============================================= -->
+              <!-- Loading -->
+              <!-- ============================================= -->
+
+              <div
+                v-if="
+                  isAnalysingSustainability
+                "
+                class="
+                  sustainability-loading
+                  p-3
+                "
+                role="status"
+                aria-live="polite"
+              >
+
+                <span
+                  class="
+                    spinner-border
+                    spinner-border-sm
+                    text-success
+                    me-2
+                  "
+                  aria-hidden="true"
+                ></span>
+
+
+                Analysing the
+                environmental impact
+                of this route...
+
+              </div>
+
+
+              <!-- ============================================= -->
+              <!-- Error -->
+              <!-- ============================================= -->
+
+              <div
+                v-else-if="
+                  sustainabilityError
+                "
+                class="
+                  alert
+                  alert-warning
+                  mb-0
+                "
+                role="alert"
+              >
+                {{
+                  sustainabilityError
+                }}
+              </div>
+
+
+              <!-- ============================================= -->
+              <!-- Sustainability result -->
+              <!-- ============================================= -->
+
+              <div
+                v-else-if="
+                  sustainabilityInfo
+                "
+                aria-live="polite"
+              >
+
+                <!-- =========================================== -->
+                <!-- Metrics -->
+                <!-- =========================================== -->
+
+                <div
+                  class="
+                    sustainability-grid
+                    mb-3
+                  "
+                >
+
+                  <div
+                    class="
+                      sustainability-metric
+                    "
+                  >
+                    <span
+                      class="
+                        sustainability-label
+                      "
+                    >
+                      Travel Mode
+                    </span>
+
+
+                    <strong>
+                      {{
+                        sustainabilityInfo
+                          .travelModeLabel
+                      }}
+                    </strong>
+                  </div>
+
+
+                  <div
+                    class="
+                      sustainability-metric
+                    "
+                  >
+                    <span
+                      class="
+                        sustainability-label
+                      "
+                    >
+                      Direct Emissions
+                    </span>
+
+
+                    <strong>
+                      {{
+                        sustainabilityInfo
+                          .estimatedCo2eKg
+                      }}
+
+                      kg CO₂e
+                    </strong>
+                  </div>
+
+
+                  <div
+                    class="
+                      sustainability-metric
+                    "
+                  >
+                    <span
+                      class="
+                        sustainability-label
+                      "
+                    >
+                      Eco Score
+                    </span>
+
+
+                    <strong>
+                      {{
+                        sustainabilityInfo
+                          .ecoScore
+                      }}
+                      / 100
+                    </strong>
+                  </div>
+
+
+                  <div
+                    class="
+                      sustainability-metric
+                    "
+                  >
+                    <span
+                      class="
+                        sustainability-label
+                      "
+                    >
+                      Sustainability
+                    </span>
+
+
+                    <strong>
+                      {{
+                        sustainabilityInfo
+                          .sustainabilityLevel
+                      }}
+                    </strong>
+                  </div>
+
+                </div>
+
+
+                <!-- =========================================== -->
+                <!-- Eco score -->
+                <!-- =========================================== -->
+
+                <div
+                  class="
+                    sustainability-level
+                    mb-3
+                  "
+                >
+
+                  <div>
+                    <span
+                      class="
+                        sustainability-label
+                      "
+                    >
+                      Route Eco Score
+                    </span>
+
+
+                    <div
+                      class="
+                        fw-bold
+                        mt-1
+                      "
+                    >
+                      {{
+                        sustainabilityInfo
+                          .sustainabilityLevel
+                      }}
+                    </div>
+                  </div>
+
+
+                  <span
+                    class="
+                      eco-score-pill
+                    "
+                    :aria-label="
+                      `Eco Score ${sustainabilityInfo.ecoScore} out of 100`
+                    "
+                  >
+                    {{
+                      sustainabilityInfo
+                        .ecoScore
+                    }}
+                  </span>
+
+                </div>
+
+
+                <!-- =========================================== -->
+                <!-- Recommendation -->
+                <!-- =========================================== -->
+
+                <div
+                  class="
+                    green-message
+                    mb-3
+                  "
+                >
+                  <strong>
+                    Recommendation
+                  </strong>
+
+
+                  <p
+                    class="
+                      mb-0
+                      mt-1
+                    "
+                  >
+                    {{
+                      sustainabilityInfo
+                        .message
+                    }}
+                  </p>
+                </div>
+
+
+                <!-- =========================================== -->
+                <!-- Greener alternative -->
+                <!-- =========================================== -->
+
+                <div
+                  v-if="
+                    sustainabilityInfo
+                      .greenerAlternative
+                  "
+                  class="
+                    alternative-card
+                    mb-3
+                  "
+                >
+                  <div
+                    class="
+                      mb-2
+                    "
+                  >
+                    <strong>
+                      Greener Alternative
+                    </strong>
+                  </div>
+
+
+                  <div
+                    class="
+                      text-capitalize
+                      fw-semibold
+                    "
+                  >
+                    🌱
+
+                    {{
+                      sustainabilityInfo
+                        .greenerAlternative
+                    }}
+                  </div>
+
+
+                  <div
+                    class="
+                      small
+                      text-secondary
+                      mt-2
+                    "
+                  >
+                    Potential direct
+                    CO₂e saving:
+
+                    <strong
+                      class="
+                        text-dark
+                      "
+                    >
+                      {{
+                        sustainabilityInfo
+                          .potentialCo2eSavingKg
+                      }}
+
+                      kg
+                    </strong>
+                  </div>
+                </div>
+
+
+                <!-- =========================================== -->
+                <!-- Disclaimer -->
+                <!-- =========================================== -->
+
+                <p
+                  class="
+                    sustainability-disclaimer
+                    mb-0
+                  "
+                >
+                  {{
+                    sustainabilityInfo
+                      .disclaimer
+                  }}
+                </p>
+
+              </div>
 
             </section>
 
@@ -1705,14 +2399,16 @@ onUnmounted(
                 visually-hidden
               "
             >
-              The interactive map visually displays
-              recycling locations, your current
-              location and calculated routes.
+              The interactive map visually
+              displays recycling locations,
+              your current location and
+              calculated routes.
 
-              Every recycling destination can also
-              be searched and selected using the
-              keyboard-accessible Search Results
-              list beside the map.
+              Every recycling destination
+              can also be searched and
+              selected using the
+              keyboard-accessible Search
+              Results list beside the map.
             </p>
 
 
@@ -1864,6 +2560,7 @@ onUnmounted(
 .control-card,
 .selected-card,
 .route-card,
+.green-route-card,
 .map-card {
   background-color:
     #ffffff;
@@ -1876,7 +2573,8 @@ onUnmounted(
     18px;
 
   box-shadow:
-    0 0.4rem 1.4rem
+    0 0.4rem
+    1.4rem
     rgba(
       0,
       0,
@@ -1910,7 +2608,8 @@ onUnmounted(
     52px;
 
   padding:
-    0.75rem 0.9rem;
+    0.75rem
+    0.9rem;
 
   background-color:
     #ffffff;
@@ -1923,9 +2622,15 @@ onUnmounted(
     10px;
 
   transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    transform 0.15s ease;
+    border-color
+    0.15s
+    ease,
+    background-color
+    0.15s
+    ease,
+    transform
+    0.15s
+    ease;
 }
 
 
@@ -1937,7 +2642,9 @@ onUnmounted(
     #146c43;
 
   transform:
-    translateY(-1px);
+    translateY(
+      -1px
+    );
 }
 
 
@@ -1983,7 +2690,8 @@ onUnmounted(
     48px;
 
   padding:
-    0.7rem 0.9rem;
+    0.7rem
+    0.9rem;
 
   cursor:
     pointer;
@@ -2063,7 +2771,8 @@ onUnmounted(
     grid;
 
   grid-template-columns:
-    100px 1fr;
+    100px
+    1fr;
 
   gap:
     1rem;
@@ -2134,6 +2843,265 @@ onUnmounted(
 
 
 /* ===================================================== */
+/* Green Route Analysis */
+/* ===================================================== */
+
+.green-route-card {
+  background:
+    linear-gradient(
+      180deg,
+      #f5fbf7
+      0%,
+      #ffffff
+      100%
+    );
+
+  border-color:
+    #9bc9a9;
+}
+
+
+.green-route-icon {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  width:
+    48px;
+
+  height:
+    48px;
+
+  flex:
+    0 0 auto;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #9bc9a9;
+
+  border-radius:
+    50%;
+
+  font-size:
+    1.3rem;
+}
+
+
+/* ===================================================== */
+/* Sustainability loading */
+/* ===================================================== */
+
+.sustainability-loading {
+  color:
+    #343a40;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #d8e7dc;
+
+  border-radius:
+    12px;
+}
+
+
+/* ===================================================== */
+/* Sustainability metric grid */
+/* ===================================================== */
+
+.sustainability-grid {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    0.65rem;
+}
+
+
+.sustainability-metric {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    0.3rem;
+
+  min-width:
+    0;
+
+  padding:
+    0.75rem;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #d8e7dc;
+
+  border-radius:
+    12px;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+.sustainability-label {
+  color:
+    #495057;
+
+  font-size:
+    0.7rem;
+
+  font-weight:
+    700;
+}
+
+
+/* ===================================================== */
+/* Sustainability level */
+/* ===================================================== */
+
+.sustainability-level {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    1rem;
+
+  padding:
+    0.8rem;
+
+  background:
+    #e6f6ea;
+
+  border:
+    1px solid
+    #9bc9a9;
+
+  border-radius:
+    12px;
+}
+
+
+.eco-score-pill {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  width:
+    54px;
+
+  height:
+    54px;
+
+  flex:
+    0 0 auto;
+
+  color:
+    #ffffff;
+
+  background:
+    #146c43;
+
+  border-radius:
+    50%;
+
+  font-weight:
+    800;
+}
+
+
+/* ===================================================== */
+/* Sustainability recommendation */
+/* ===================================================== */
+
+.green-message {
+  padding:
+    0.8rem;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #d8e7dc;
+
+  border-radius:
+    12px;
+}
+
+
+/* ===================================================== */
+/* Greener alternative */
+/* ===================================================== */
+
+.alternative-card {
+  padding:
+    0.8rem;
+
+  background:
+    #fffdf3;
+
+  border:
+    1px solid
+    #dfd6a2;
+
+  border-radius:
+    12px;
+}
+
+
+/* ===================================================== */
+/* Sustainability disclaimer */
+/* ===================================================== */
+
+.sustainability-disclaimer {
+  color:
+    #495057;
+
+  font-size:
+    0.65rem;
+
+  line-height:
+    1.5;
+}
+
+
+/* ===================================================== */
 /* Map */
 /* ===================================================== */
 
@@ -2184,9 +3152,6 @@ onUnmounted(
 /*
   Recycling markers are visual duplicates of the
   keyboard-accessible location buttons.
-
-  They intentionally do not act as independent
-  touch or keyboard controls.
 */
 
 :deep(.mapboxgl-marker) {
@@ -2216,7 +3181,8 @@ onUnmounted(
     0.35rem;
 
   padding:
-    0.7rem 0.9rem;
+    0.7rem
+    0.9rem;
 
   color:
     #212529;
@@ -2236,7 +3202,8 @@ onUnmounted(
     10px;
 
   box-shadow:
-    0 0.2rem 0.8rem
+    0 0.2rem
+    0.8rem
     rgba(
       0,
       0,
@@ -2288,7 +3255,8 @@ onUnmounted(
 
 .map-note {
   padding:
-    0.9rem 1rem;
+    0.9rem
+    1rem;
 
   color:
     #495057;
@@ -2313,7 +3281,8 @@ onUnmounted(
     #146c43;
 
   box-shadow:
-    0 0 0 0.2rem
+    0 0 0
+    0.2rem
     rgba(
       20,
       108,
@@ -2387,6 +3356,12 @@ onUnmounted(
 
     gap:
       0.15rem;
+  }
+
+
+  .sustainability-grid {
+    grid-template-columns:
+      1fr;
   }
 
 

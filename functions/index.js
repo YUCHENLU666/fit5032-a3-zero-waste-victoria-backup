@@ -1438,3 +1438,454 @@ exports.recommendRecyclingLocations =
         };
       },
   );
+
+  // ======================================================
+// CLOUD FUNCTION:
+// calculateRouteSustainability
+// ======================================================
+//
+// Purpose:
+//
+// Analyse the sustainability of a route calculated by
+// the Recycling Map.
+//
+// The frontend first uses Mapbox to calculate:
+//
+// - Travel mode
+// - Route distance
+// - Route duration
+//
+// These values are then sent to this Firebase callable
+// Cloud Function for independent server-side analysis.
+//
+// Supported travel modes:
+//
+// - driving
+// - walking
+// - cycling
+//
+// This is independent non-email Cloud Function #3.
+// ======================================================
+
+exports.calculateRouteSustainability =
+  onCall(
+      {
+        region:
+          "australia-southeast2",
+
+        maxInstances:
+          5,
+      },
+
+      async (request) => {
+        // ==================================================
+        // 1. Read input
+        // ==================================================
+
+        const {
+          travelMode,
+          distanceMeters,
+          durationSeconds,
+        } =
+          request.data || {};
+
+
+        // ==================================================
+        // 2. Validate travel mode
+        // ==================================================
+
+        const supportedTravelModes = [
+          "driving",
+          "walking",
+          "cycling",
+        ];
+
+
+        if (
+          !travelMode ||
+          typeof travelMode !==
+            "string" ||
+          !supportedTravelModes.includes(
+              travelMode,
+          )
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Travel mode must be driving, walking or cycling.",
+          );
+        }
+
+
+        // ==================================================
+        // 3. Validate route distance
+        // ==================================================
+
+        const numericDistanceMeters =
+          Number(
+              distanceMeters,
+          );
+
+
+        if (
+          !Number.isFinite(
+              numericDistanceMeters,
+          ) ||
+          numericDistanceMeters <=
+            0
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Route distance must be greater than zero.",
+          );
+        }
+
+
+        // Protect the function from unrealistic values.
+
+        if (
+          numericDistanceMeters >
+          1000000
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Route distance is outside the supported range.",
+          );
+        }
+
+
+        // ==================================================
+        // 4. Validate route duration
+        // ==================================================
+
+        const numericDurationSeconds =
+          Number(
+              durationSeconds,
+          );
+
+
+        if (
+          !Number.isFinite(
+              numericDurationSeconds,
+          ) ||
+          numericDurationSeconds <=
+            0
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Route duration must be greater than zero.",
+          );
+        }
+
+
+        if (
+          numericDurationSeconds >
+          86400
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Route duration is outside the supported range.",
+          );
+        }
+
+
+        // ==================================================
+        // 5. Convert route values
+        // ==================================================
+
+        const distanceKm =
+          numericDistanceMeters /
+          1000;
+
+
+        const durationMinutes =
+          numericDurationSeconds /
+          60;
+
+
+        // ==================================================
+        // 6. Educational emission factors
+        // ==================================================
+        //
+        // These values are illustrative estimates used
+        // for this university project.
+        //
+        // They are NOT official transport emissions
+        // accounting figures.
+        //
+        // kg CO2e per kilometre:
+        //
+        // driving = 0.192
+        // walking = 0 direct travel emissions
+        // cycling = 0 direct travel emissions
+        // ==================================================
+
+        const emissionFactors = {
+          driving:
+            0.192,
+
+          walking:
+            0,
+
+          cycling:
+            0,
+        };
+
+
+        const emissionFactor =
+          emissionFactors[
+              travelMode
+          ];
+
+
+        // ==================================================
+        // 7. Calculate estimated emissions
+        // ==================================================
+
+        const estimatedCo2eKg =
+          distanceKm *
+          emissionFactor;
+
+
+        // ==================================================
+        // 8. Calculate Eco Score
+        // ==================================================
+        //
+        // Walking and cycling receive the highest score
+        // because the model considers direct travel
+        // emissions only.
+        //
+        // Driving begins at a lower score and decreases
+        // as route distance increases.
+        // ==================================================
+
+        let ecoScore;
+
+
+        if (
+          travelMode ===
+            "walking" ||
+          travelMode ===
+            "cycling"
+        ) {
+          ecoScore =
+            100;
+        } else {
+          ecoScore =
+            Math.max(
+                15,
+
+                Math.round(
+                    70 -
+                    distanceKm *
+                    3.5,
+                ),
+            );
+        }
+
+
+        // ==================================================
+        // 9. Sustainability level
+        // ==================================================
+
+        let sustainabilityLevel;
+
+
+        if (
+          ecoScore >=
+          80
+        ) {
+          sustainabilityLevel =
+            "Excellent";
+        } else if (
+          ecoScore >=
+          60
+        ) {
+          sustainabilityLevel =
+            "Good";
+        } else if (
+          ecoScore >=
+          40
+        ) {
+          sustainabilityLevel =
+            "Moderate";
+        } else {
+          sustainabilityLevel =
+            "High Impact";
+        }
+
+
+        // ==================================================
+        // 10. Greener alternative
+        // ==================================================
+
+        let greenerAlternative =
+          null;
+
+
+        let potentialCo2eSavingKg =
+          0;
+
+
+        let message;
+
+
+        if (
+          travelMode ===
+          "driving"
+        ) {
+          // -----------------------------------------------
+          // Short routes:
+          // walking may be practical.
+          // -----------------------------------------------
+
+          if (
+            distanceKm <=
+            2
+          ) {
+            greenerAlternative =
+              "walking";
+
+            message =
+              "For this short journey, walking may be a practical lower-emission alternative.";
+          } else {
+            // ---------------------------------------------
+            // Longer local routes:
+            // cycling may be more practical than walking.
+            // ---------------------------------------------
+
+            greenerAlternative =
+              "cycling";
+
+            message =
+              "Cycling could reduce direct travel emissions for this journey if the route is practical and safe.";
+          }
+
+
+          potentialCo2eSavingKg =
+            estimatedCo2eKg;
+        } else if (
+          travelMode ===
+          "cycling"
+        ) {
+          message =
+            "Cycling is a strong low-emission travel choice for this route.";
+        } else {
+          message =
+            "Walking is a strong low-emission travel choice for this route.";
+        }
+
+
+        // ==================================================
+        // 11. Travel mode label
+        // ==================================================
+
+        const travelModeLabels = {
+          driving:
+            "Driving",
+
+          walking:
+            "Walking",
+
+          cycling:
+            "Cycling",
+        };
+
+
+        // ==================================================
+        // 12. Build structured response
+        // ==================================================
+
+        const result = {
+          travelMode:
+            travelMode,
+
+          travelModeLabel:
+            travelModeLabels[
+                travelMode
+            ],
+
+          distanceKm:
+            Number(
+                distanceKm
+                    .toFixed(
+                        2,
+                    ),
+            ),
+
+          durationMinutes:
+            Number(
+                durationMinutes
+                    .toFixed(
+                        1,
+                    ),
+            ),
+
+          estimatedCo2eKg:
+            Number(
+                estimatedCo2eKg
+                    .toFixed(
+                        3,
+                    ),
+            ),
+
+          ecoScore:
+            ecoScore,
+
+          sustainabilityLevel:
+            sustainabilityLevel,
+
+          greenerAlternative:
+            greenerAlternative,
+
+          potentialCo2eSavingKg:
+            Number(
+                potentialCo2eSavingKg
+                    .toFixed(
+                        3,
+                    ),
+            ),
+
+          message:
+            message,
+
+          disclaimer:
+            "Travel emissions and Eco Scores are illustrative educational estimates for the ZWV Circular Hub project and are not official transport emissions calculations.",
+        };
+
+
+        // ==================================================
+        // 13. Log successful analysis
+        // ==================================================
+
+        logger.info(
+            "Route sustainability calculated.",
+            {
+              travelMode:
+                travelMode,
+
+              distanceKm:
+                result.distanceKm,
+
+              durationMinutes:
+                result.durationMinutes,
+
+              estimatedCo2eKg:
+                result.estimatedCo2eKg,
+
+              ecoScore:
+                result.ecoScore,
+
+              sustainabilityLevel:
+                result
+                    .sustainabilityLevel,
+            },
+        );
+
+
+        // ==================================================
+        // 14. Return result
+        // ==================================================
+
+        return result;
+      },
+  );
