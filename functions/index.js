@@ -11,8 +11,7 @@ const {
   defineSecret,
 } = require("firebase-functions/params");
 
-const logger =
-  require("firebase-functions/logger");
+const logger = require("firebase-functions/logger");
 
 const {
   initializeApp,
@@ -66,6 +65,23 @@ const resendApiKey =
 
 
 // ======================================================
+// Shared constants
+// ======================================================
+
+const EMAIL_FROM =
+  "ZWV Circular Hub <onboarding@resend.dev>";
+
+const MAX_BULK_RECIPIENTS =
+  100;
+
+const MAX_SUBJECT_LENGTH =
+  150;
+
+const MAX_MESSAGE_LENGTH =
+  5000;
+
+
+// ======================================================
 // Helper: validate email
 // ======================================================
 
@@ -77,6 +93,197 @@ const isValidEmail =
     return pattern.test(
         email,
     );
+  };
+
+
+// ======================================================
+// Helper: validate subject and message
+// ======================================================
+//
+// Both the single-email feature and Bulk Email feature use
+// the same server-side validation rules.
+//
+// This avoids relying only on frontend form validation.
+// ======================================================
+
+const validateEmailContent =
+  (
+      subject,
+      message,
+  ) => {
+    if (
+      !subject ||
+      typeof subject !==
+        "string" ||
+      subject.trim().length <
+        1 ||
+      subject.trim().length >
+        MAX_SUBJECT_LENGTH
+    ) {
+      throw new HttpsError(
+          "invalid-argument",
+          `Subject must be between 1 and ${MAX_SUBJECT_LENGTH} characters.`,
+      );
+    }
+
+
+    if (
+      !message ||
+      typeof message !==
+        "string" ||
+      message.trim().length <
+        1 ||
+      message.trim().length >
+        MAX_MESSAGE_LENGTH
+    ) {
+      throw new HttpsError(
+          "invalid-argument",
+          `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters.`,
+      );
+    }
+
+
+    return {
+      cleanSubject:
+        subject.trim(),
+
+      cleanMessage:
+        message.trim(),
+    };
+  };
+
+
+// ======================================================
+// Helper: require administrator
+// ======================================================
+//
+// IMPORTANT:
+//
+// Vue Router protects /admin on the frontend.
+//
+// However, client-side route protection must not be the
+// only security layer for privileged functionality.
+//
+// This helper independently verifies:
+//
+// 1. Firebase Authentication
+// 2. Firestore application profile
+// 3. role === "admin"
+//
+// before an administrator-only Cloud Function continues.
+// ======================================================
+
+const requireAdministrator =
+  async (
+      request,
+  ) => {
+    // ------------------------------------------------------
+    // Require Firebase Authentication
+    // ------------------------------------------------------
+
+    if (!request.auth) {
+      throw new HttpsError(
+          "unauthenticated",
+          "You must be signed in to use this administrator feature.",
+      );
+    }
+
+
+    try {
+      const adminProfileSnapshot =
+        await getFirestore()
+            .collection(
+                "users",
+            )
+            .doc(
+                request.auth.uid,
+            )
+            .get();
+
+
+      // ----------------------------------------------------
+      // Firestore application profile must exist
+      // ----------------------------------------------------
+
+      if (
+        !adminProfileSnapshot.exists
+      ) {
+        logger.warn(
+            "Blocked admin action because application profile was not found.",
+            {
+              requesterUid:
+                request.auth.uid,
+            },
+        );
+
+
+        throw new HttpsError(
+            "permission-denied",
+            "Administrator access is required.",
+        );
+      }
+
+
+      const adminProfile =
+        adminProfileSnapshot.data() ||
+        {};
+
+
+      // ----------------------------------------------------
+      // Server-side administrator role check
+      // ----------------------------------------------------
+
+      if (
+        adminProfile.role !==
+        "admin"
+      ) {
+        logger.warn(
+            "Blocked admin action because caller is not an administrator.",
+            {
+              requesterUid:
+                request.auth.uid,
+
+              role:
+                adminProfile.role ||
+                "unknown",
+            },
+        );
+
+
+        throw new HttpsError(
+            "permission-denied",
+            "Administrator access is required.",
+        );
+      }
+
+
+      return adminProfile;
+    } catch (error) {
+      if (
+        error instanceof
+        HttpsError
+      ) {
+        throw error;
+      }
+
+
+      logger.error(
+          "Unable to verify administrator role.",
+          {
+            requesterUid:
+              request.auth.uid,
+
+            message:
+              error.message,
+          },
+      );
+
+
+      throw new HttpsError(
+          "internal",
+          "Unable to verify administrator access.",
+      );
+    }
   };
 
 
@@ -192,9 +399,8 @@ exports.getEmailRecipients =
                             email,
                         };
                       } catch (error) {
-                        // Ignore orphan Firestore
-                        // profiles that no longer have
-                        // Firebase Authentication accounts.
+                        // Ignore Firestore profiles that no
+                        // longer have Firebase Auth accounts.
 
                         if (
                           error.code ===
@@ -207,6 +413,7 @@ exports.getEmailRecipients =
                                   userDocument.id,
                               },
                           );
+
 
                           return null;
                         }
@@ -539,50 +746,25 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 7. Validate subject
+        // 7. Validate email content
         // ==================================================
 
-        if (
-          !subject ||
-          typeof subject !==
-            "string" ||
-          subject.trim().length <
-            1 ||
-          subject.trim().length >
-            150
-        ) {
-          throw new HttpsError(
-              "invalid-argument",
-              "Subject must be between 1 and 150 characters.",
+        const {
+          cleanSubject,
+          cleanMessage,
+        } =
+          validateEmailContent(
+              subject,
+              message,
           );
-        }
 
 
         // ==================================================
-        // 8. Validate message
+        // 8. Validate optional attachment
         // ==================================================
 
-        if (
-          !message ||
-          typeof message !==
-            "string" ||
-          message.trim().length <
-            1 ||
-          message.trim().length >
-            5000
-        ) {
-          throw new HttpsError(
-              "invalid-argument",
-              "Message must be between 1 and 5000 characters.",
-          );
-        }
-
-
-        // ==================================================
-        // 9. Validate optional attachment
-        // ==================================================
-
-        const attachments = [];
+        const attachments =
+          [];
 
 
         if (attachment) {
@@ -628,7 +810,7 @@ exports.sendEmail =
 
 
         // ==================================================
-        // 10. Send email using Resend
+        // 9. Send email using Resend
         // ==================================================
 
         try {
@@ -640,17 +822,17 @@ exports.sendEmail =
 
           const emailData = {
             from:
-              "ZWV Circular Hub <onboarding@resend.dev>",
+              EMAIL_FROM,
 
             to: [
               recipientEmail,
             ],
 
             subject:
-              subject.trim(),
+              cleanSubject,
 
             text:
-              message.trim(),
+              cleanMessage,
           };
 
 
@@ -758,6 +940,608 @@ exports.sendEmail =
 
 // ======================================================
 // CLOUD FUNCTION:
+// sendBulkEmail
+// ======================================================
+//
+// Purpose:
+//
+// Allow an administrator to send one email campaign to
+// multiple registered community users.
+//
+// This is an extended innovation feature for the
+// administrator dashboard.
+//
+// Security:
+//
+// 1. Caller must be authenticated.
+// 2. Caller must be an administrator in Firestore.
+// 3. Frontend sends Firebase UIDs, not arbitrary emails.
+// 4. Duplicate UIDs are removed server-side.
+// 5. Firebase Authentication accounts are verified.
+// 6. Firestore application profiles are verified.
+// 7. Only role === "user" accounts are included.
+// 8. Disabled or invalid users are skipped.
+// 9. Subject and message are validated server-side.
+// 10. Resend API key remains in Firebase Secret Manager.
+// 11. Each recipient receives an individual email.
+//
+// The Batch API does not expose recipients to each other
+// through a shared To or CC field.
+// ======================================================
+
+exports.sendBulkEmail =
+  onCall(
+      {
+        region:
+          "australia-southeast2",
+
+        secrets: [
+          resendApiKey,
+        ],
+
+        maxInstances:
+          3,
+      },
+
+      async (request) => {
+        // ==================================================
+        // 1. Server-side administrator authorisation
+        // ==================================================
+
+        await requireAdministrator(
+            request,
+        );
+
+
+        // ==================================================
+        // 2. Read input
+        // ==================================================
+
+        const {
+          recipientUids,
+          subject,
+          message,
+        } =
+          request.data || {};
+
+
+        // ==================================================
+        // 3. Validate recipient array
+        // ==================================================
+
+        if (
+          !Array.isArray(
+              recipientUids,
+          )
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Please select at least one community user.",
+          );
+        }
+
+
+        // --------------------------------------------------
+        // Keep only string UIDs.
+        // Remove surrounding whitespace.
+        // Remove empty values.
+        // --------------------------------------------------
+
+        const cleanRecipientUids =
+          recipientUids
+              .filter(
+                  (uid) =>
+                    typeof uid ===
+                    "string",
+              )
+              .map(
+                  (uid) =>
+                    uid.trim(),
+              )
+              .filter(
+                  Boolean,
+              );
+
+
+        // --------------------------------------------------
+        // Prevent duplicate sends to the same UID.
+        // --------------------------------------------------
+
+        const uniqueRecipientUids =
+          [
+            ...new Set(
+                cleanRecipientUids,
+            ),
+          ];
+
+
+        if (
+          uniqueRecipientUids.length <
+          1
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              "Please select at least one community user.",
+          );
+        }
+
+
+        // --------------------------------------------------
+        // Resend Batch API supports a maximum campaign size
+        // of 100 email objects per request.
+        // --------------------------------------------------
+
+        if (
+          uniqueRecipientUids.length >
+          MAX_BULK_RECIPIENTS
+        ) {
+          throw new HttpsError(
+              "invalid-argument",
+              `A maximum of ${MAX_BULK_RECIPIENTS} recipients is supported per bulk email campaign.`,
+          );
+        }
+
+
+        // ==================================================
+        // 4. Validate campaign subject and message
+        // ==================================================
+
+        const {
+          cleanSubject,
+          cleanMessage,
+        } =
+          validateEmailContent(
+              subject,
+              message,
+          );
+
+
+        try {
+          const db =
+            getFirestore();
+
+
+          // ==================================================
+          // 5. Load Firebase Authentication accounts
+          // ==================================================
+          //
+          // getUsers() allows the server to resolve users by
+          // Firebase UID in one Admin SDK operation.
+          //
+          // Emails are NEVER trusted from the frontend.
+          // ==================================================
+
+          const authLookup =
+            await getAuth()
+                .getUsers(
+                    uniqueRecipientUids.map(
+                        (uid) => ({
+                          uid,
+                        }),
+                    ),
+                );
+
+
+          const authUsersByUid =
+            new Map(
+                authLookup.users.map(
+                    (user) => [
+                      user.uid,
+                      user,
+                    ],
+                ),
+            );
+
+
+          // ==================================================
+          // 6. Load Firestore application profiles
+          // ==================================================
+
+          const profileReferences =
+            uniqueRecipientUids.map(
+                (uid) =>
+                  db
+                      .collection(
+                          "users",
+                      )
+                      .doc(
+                          uid,
+                      ),
+            );
+
+
+          const profileSnapshots =
+            await db.getAll(
+                ...profileReferences,
+            );
+
+
+          const profilesByUid =
+            new Map(
+                profileSnapshots
+                    .filter(
+                        (
+                            snapshot,
+                        ) =>
+                          snapshot.exists,
+                    )
+                    .map(
+                        (
+                            snapshot,
+                        ) => [
+                          snapshot.id,
+                          snapshot.data() ||
+                            {},
+                        ],
+                    ),
+            );
+
+
+          // ==================================================
+          // 7. Validate every selected recipient
+          // ==================================================
+
+          const validRecipients =
+            [];
+
+          const skippedRecipients =
+            [];
+
+
+          uniqueRecipientUids.forEach(
+              (uid) => {
+                const authUser =
+                  authUsersByUid.get(
+                      uid,
+                  );
+
+                const profile =
+                  profilesByUid.get(
+                      uid,
+                  );
+
+
+                // ------------------------------------------
+                // Firebase Authentication account missing
+                // ------------------------------------------
+
+                if (!authUser) {
+                  skippedRecipients.push({
+                    uid,
+
+                    reason:
+                      "Authentication account not found",
+                  });
+
+                  return;
+                }
+
+
+                // ------------------------------------------
+                // Firestore profile missing
+                // ------------------------------------------
+
+                if (!profile) {
+                  skippedRecipients.push({
+                    uid,
+
+                    reason:
+                      "Application profile not found",
+                  });
+
+                  return;
+                }
+
+
+                // ------------------------------------------
+                // Bulk campaigns are for community users.
+                //
+                // Administrators are not included.
+                // ------------------------------------------
+
+                if (
+                  profile.role !==
+                  "user"
+                ) {
+                  skippedRecipients.push({
+                    uid,
+
+                    reason:
+                      "Recipient is not a community user",
+                  });
+
+                  return;
+                }
+
+
+                // ------------------------------------------
+                // Disabled Firebase accounts are excluded
+                // ------------------------------------------
+
+                if (
+                  authUser.disabled
+                ) {
+                  skippedRecipients.push({
+                    uid,
+
+                    reason:
+                      "Account is disabled",
+                  });
+
+                  return;
+                }
+
+
+                // ------------------------------------------
+                // Resolve real email server-side
+                // ------------------------------------------
+
+                const email =
+                  authUser.email
+                      ?.trim()
+                      .toLowerCase();
+
+
+                if (
+                  !email ||
+                  !isValidEmail(
+                      email,
+                  )
+                ) {
+                  skippedRecipients.push({
+                    uid,
+
+                    reason:
+                      "Valid email address not available",
+                  });
+
+                  return;
+                }
+
+
+                validRecipients.push({
+                  uid,
+
+                  email,
+
+                  username:
+                    profile.username ||
+                    authUser.displayName ||
+                    "ZWV User",
+                });
+              },
+          );
+
+
+          // ==================================================
+          // 8. Require at least one valid recipient
+          // ==================================================
+
+          if (
+            validRecipients.length <
+            1
+          ) {
+            throw new HttpsError(
+                "failed-precondition",
+                "None of the selected accounts can receive this campaign.",
+            );
+          }
+
+
+          // ==================================================
+          // 9. Build individual emails
+          // ==================================================
+          //
+          // Every registered user receives a separate message.
+          //
+          // Their email address is NOT exposed to other users
+          // through CC or a shared recipient list.
+          // ==================================================
+
+          const batchEmails =
+            validRecipients.map(
+                (
+                    recipient,
+                ) => ({
+                  from:
+                    EMAIL_FROM,
+
+                  to: [
+                    recipient.email,
+                  ],
+
+                  subject:
+                    cleanSubject,
+
+                  text:
+                    cleanMessage,
+
+                  tags: [
+                    {
+                      name:
+                        "category",
+
+                      value:
+                        "admin_bulk_email",
+                    },
+                  ],
+                }),
+            );
+
+
+          // ==================================================
+          // 10. Send with Resend Batch API
+          // ==================================================
+
+          const resend =
+            new Resend(
+                resendApiKey.value(),
+            );
+
+
+          const {
+            data,
+            error,
+          } =
+            await resend.batch.send(
+                batchEmails,
+            );
+
+
+          if (error) {
+            logger.error(
+                "Resend rejected the bulk email campaign.",
+                {
+                  error,
+
+                  administratorUid:
+                    request.auth.uid,
+
+                  selectedCount:
+                    uniqueRecipientUids.length,
+
+                  validCount:
+                    validRecipients.length,
+                },
+            );
+
+
+            throw new HttpsError(
+                "internal",
+                "The bulk email campaign could not be sent.",
+            );
+          }
+
+
+          // ==================================================
+          // 11. Normalise Resend result IDs
+          // ==================================================
+          //
+          // Keep frontend result handling simple even if the
+          // SDK response shape changes slightly.
+          // ==================================================
+
+          let batchResults =
+            [];
+
+
+          if (
+            Array.isArray(
+                data,
+            )
+          ) {
+            batchResults =
+              data;
+          } else if (
+            Array.isArray(
+                data?.data,
+            )
+          ) {
+            batchResults =
+              data.data;
+          }
+
+
+          const emailIds =
+            batchResults
+                .map(
+                    (
+                        result,
+                    ) =>
+                      result?.id,
+                )
+                .filter(
+                    Boolean,
+                );
+
+
+          // ==================================================
+          // 12. Log successful campaign
+          // ==================================================
+
+          logger.info(
+              "Bulk email campaign sent successfully.",
+              {
+                administratorUid:
+                  request.auth.uid,
+
+                selectedCount:
+                  uniqueRecipientUids.length,
+
+                sentCount:
+                  validRecipients.length,
+
+                skippedCount:
+                  skippedRecipients.length,
+
+                emailIds:
+                  emailIds,
+              },
+          );
+
+
+          // ==================================================
+          // 13. Return campaign result
+          // ==================================================
+
+          return {
+            success:
+              true,
+
+            selectedCount:
+              uniqueRecipientUids.length,
+
+            sentCount:
+              validRecipients.length,
+
+            skippedCount:
+              skippedRecipients.length,
+
+            skippedRecipients:
+              skippedRecipients,
+
+            emailIds:
+              emailIds,
+
+            message:
+              `Bulk email sent to ${validRecipients.length} ${
+                validRecipients.length === 1
+                  ? "user"
+                  : "users"
+              }.`,
+          };
+        } catch (error) {
+          if (
+            error instanceof
+            HttpsError
+          ) {
+            throw error;
+          }
+
+
+          logger.error(
+              "Unexpected bulk email error.",
+              {
+                administratorUid:
+                  request.auth.uid,
+
+                message:
+                  error.message,
+              },
+          );
+
+
+          throw new HttpsError(
+              "internal",
+              "An unexpected error occurred while sending the bulk email.",
+          );
+        }
+      },
+  );
+
+
+// ======================================================
+// CLOUD FUNCTION:
 // calculateRecyclingImpact
 // ======================================================
 //
@@ -765,8 +1549,6 @@ exports.sendEmail =
 //
 // Calculate an educational estimate of the environmental
 // impact produced by recycling a selected material.
-//
-// This is an independent non-email Cloud Function.
 //
 // Input:
 //
@@ -1037,8 +1819,6 @@ exports.calculateRecyclingImpact =
 // 3. Whether the location is currently open
 // 4. Location rating
 // 5. Approximate distance
-//
-// This is independent non-email Cloud Function #2.
 // ======================================================
 
 exports.recommendRecyclingLocations =
@@ -1150,9 +1930,12 @@ exports.recommendRecyclingLocations =
 
         const matchingLocations =
           recyclingLocations.filter(
-              (location) =>
+              (
+                  location,
+              ) =>
                 Array.isArray(
-                    location.acceptedMaterials,
+                    location
+                        .acceptedMaterials,
                 ) &&
                 location
                     .acceptedMaterials
@@ -1168,7 +1951,9 @@ exports.recommendRecyclingLocations =
 
         const rankedLocations =
           matchingLocations.map(
-              (location) => {
+              (
+                  location,
+              ) => {
                 const samePostcode =
                   location.postcode ===
                   cleanPostcode;
@@ -1184,7 +1969,7 @@ exports.recommendRecyclingLocations =
 
 
                 // ------------------------------------------
-                // Exact postcode
+                // Exact postcode match
                 // ------------------------------------------
 
                 if (samePostcode) {
@@ -1204,28 +1989,24 @@ exports.recommendRecyclingLocations =
 
 
                 // ------------------------------------------
-                // Rating
-                //
-                // Example:
-                // 4.8 stars = 24 points
+                // Rating bonus
                 // ------------------------------------------
 
                 recommendationScore +=
                   Number(
                       location.rating,
-                  ) * 5;
+                  ) *
+                  5;
 
 
                 // ------------------------------------------
                 // Approximate distance bonus
-                //
-                // Existing project dataset already includes
-                // an approximate distance field.
                 // ------------------------------------------
 
                 const distanceBonus =
                   Math.max(
                       0,
+
                       20 -
                       Number(
                           location.distance,
@@ -1238,7 +2019,7 @@ exports.recommendRecyclingLocations =
 
 
                 // ------------------------------------------
-                // Human-readable reasons
+                // Human-readable recommendation reasons
                 // ------------------------------------------
 
                 const reasons = [
@@ -1321,7 +2102,7 @@ exports.recommendRecyclingLocations =
 
 
               // ------------------------------------------
-              // Open before closed
+              // Open locations first
               // ------------------------------------------
 
               if (
@@ -1392,7 +2173,7 @@ exports.recommendRecyclingLocations =
 
 
         // ==================================================
-        // 9. Log successful recommendation
+        // 9. Log result
         // ==================================================
 
         logger.info(
@@ -1439,7 +2220,8 @@ exports.recommendRecyclingLocations =
       },
   );
 
-  // ======================================================
+
+// ======================================================
 // CLOUD FUNCTION:
 // calculateRouteSustainability
 // ======================================================
@@ -1463,8 +2245,6 @@ exports.recommendRecyclingLocations =
 // - driving
 // - walking
 // - cycling
-//
-// This is independent non-email Cloud Function #3.
 // ======================================================
 
 exports.calculateRouteSustainability =
@@ -1540,7 +2320,7 @@ exports.calculateRouteSustainability =
         }
 
 
-        // Protect the function from unrealistic values.
+        // Protect function from unrealistic values.
 
         if (
           numericDistanceMeters >
@@ -1606,17 +2386,13 @@ exports.calculateRouteSustainability =
         // 6. Educational emission factors
         // ==================================================
         //
-        // These values are illustrative estimates used
-        // for this university project.
-        //
-        // They are NOT official transport emissions
-        // accounting figures.
+        // Illustrative estimates for the university project.
         //
         // kg CO2e per kilometre:
         //
         // driving = 0.192
-        // walking = 0 direct travel emissions
-        // cycling = 0 direct travel emissions
+        // walking = 0
+        // cycling = 0
         // ==================================================
 
         const emissionFactors = {
@@ -1648,14 +2424,6 @@ exports.calculateRouteSustainability =
 
         // ==================================================
         // 8. Calculate Eco Score
-        // ==================================================
-        //
-        // Walking and cycling receive the highest score
-        // because the model considers direct travel
-        // emissions only.
-        //
-        // Driving begins at a lower score and decreases
-        // as route distance increases.
         // ==================================================
 
         let ecoScore;
@@ -1726,18 +2494,13 @@ exports.calculateRouteSustainability =
           0;
 
 
-        let message;
+        let resultMessage;
 
 
         if (
           travelMode ===
           "driving"
         ) {
-          // -----------------------------------------------
-          // Short routes:
-          // walking may be practical.
-          // -----------------------------------------------
-
           if (
             distanceKm <=
             2
@@ -1745,18 +2508,13 @@ exports.calculateRouteSustainability =
             greenerAlternative =
               "walking";
 
-            message =
+            resultMessage =
               "For this short journey, walking may be a practical lower-emission alternative.";
           } else {
-            // ---------------------------------------------
-            // Longer local routes:
-            // cycling may be more practical than walking.
-            // ---------------------------------------------
-
             greenerAlternative =
               "cycling";
 
-            message =
+            resultMessage =
               "Cycling could reduce direct travel emissions for this journey if the route is practical and safe.";
           }
 
@@ -1767,10 +2525,10 @@ exports.calculateRouteSustainability =
           travelMode ===
           "cycling"
         ) {
-          message =
+          resultMessage =
             "Cycling is a strong low-emission travel choice for this route.";
         } else {
-          message =
+          resultMessage =
             "Walking is a strong low-emission travel choice for this route.";
         }
 
@@ -1846,7 +2604,7 @@ exports.calculateRouteSustainability =
             ),
 
           message:
-            message,
+            resultMessage,
 
           disclaimer:
             "Travel emissions and Eco Scores are illustrative educational estimates for the ZWV Circular Hub project and are not official transport emissions calculations.",

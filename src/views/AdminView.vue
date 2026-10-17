@@ -6,6 +6,8 @@ import {
   ref,
 } from 'vue'
 
+import BulkEmailPanel from '../components/BulkEmailPanel.vue'
+
 import {
   getCurrentUser,
   getUsers,
@@ -236,8 +238,9 @@ const formatDate =
               }}
             </strong>.
 
-            Manage and review
-            ZWV Circular Hub users.
+            Manage registered users,
+            review account information
+            and send community announcements.
           </p>
 
         </div>
@@ -581,6 +584,146 @@ const formatDate =
 
           </div>
 
+        </div>
+
+      </section>
+
+
+      <!-- ================================================= -->
+      <!-- Bulk Email Campaign -->
+      <!-- ================================================= -->
+      <!--
+        The BulkEmailPanel reuses the user data already
+        loaded by this dashboard.
+
+        This avoids an unnecessary second Firestore request.
+
+        The component only displays normal community users,
+        while the Firebase Cloud Function independently
+        verifies the administrator role before sending.
+      -->
+
+      <section
+        class="
+          mb-5
+        "
+        aria-labelledby="bulk-email-section-title"
+      >
+        <h2
+          id="bulk-email-section-title"
+          class="
+            visually-hidden
+          "
+        >
+          Bulk email campaign
+        </h2>
+
+
+        <!-- ================================================= -->
+        <!-- Bulk Email loading state -->
+        <!-- ================================================= -->
+
+        <div
+          v-if="
+            isLoading
+          "
+          class="
+            card
+            border-0
+            shadow-sm
+          "
+        >
+          <div
+            class="
+              card-body
+              text-center
+              py-5
+            "
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+
+            <div
+              class="
+                spinner-border
+                text-success
+                mb-3
+              "
+              aria-hidden="true"
+            ></div>
+
+
+            <p
+              class="
+                fw-semibold
+                mb-1
+              "
+            >
+              Preparing Bulk Email
+            </p>
+
+
+            <p
+              class="
+                text-muted
+                small
+                mb-0
+              "
+            >
+              Loading registered community users...
+            </p>
+
+          </div>
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- Bulk Email available -->
+        <!-- ================================================= -->
+
+        <BulkEmailPanel
+          v-else-if="
+            !loadError
+          "
+          :users="
+            users
+          "
+        />
+
+
+        <!-- ================================================= -->
+        <!-- Bulk Email unavailable -->
+        <!-- ================================================= -->
+
+        <div
+          v-else
+          class="
+            card
+            border-0
+            shadow-sm
+          "
+        >
+          <div
+            class="
+              card-body
+              p-4
+            "
+          >
+
+            <div
+              class="
+                alert
+                alert-warning
+                mb-0
+              "
+              role="status"
+            >
+              Bulk Email is temporarily unavailable because
+              the registered user list could not be loaded.
+            </div>
+
+          </div>
         </div>
 
       </section>
@@ -1015,7 +1158,7 @@ const formatDate =
             🔐
           </span>
 
-          Role-protected Firebase page
+          Role-protected Firebase administration
         </h2>
 
 
@@ -1030,9 +1173,12 @@ const formatDate =
           an administrator role stored
           in Cloud Firestore.
 
-          Firestore security rules also
-          enforce access to protected
-          user data.
+          Firestore security rules protect
+          access to user data, while
+          administrator-only Cloud Functions
+          independently verify the caller's
+          role before privileged operations
+          such as Bulk Email are performed.
         </p>
 
       </aside>
